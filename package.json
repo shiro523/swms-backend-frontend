@@ -1,0 +1,15 @@
+{
+  "name": "swms",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Basura Watch — runs the Express backend and Next.js frontend together.",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green \"npm --prefix backend-swms run dev\" \"npm --prefix swms-frontend run dev\"",
+    "db:reset": "npm --prefix backend-swms run db:reset",
+    "db:seed": "npm --prefix backend-swms run db:seed",
+    "install:all": "npm install && npm --prefix backend-swms install && npm --prefix swms-frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

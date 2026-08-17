@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "swms-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "swms-frontend", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

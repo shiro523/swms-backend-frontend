@@ -1,0 +1,148 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Purok {
+  id             String      @id
+  name           String
+  leaderName     String      @map("leader_name")
+  complianceRate Int         @default(0) @map("compliance_rate")
+  households     Household[]
+  users          User[]
+
+  @@map("puroks")
+}
+
+model Household {
+  id             String         @id
+  code           String         @unique
+  representative String
+  address        String
+  purokId        String         @map("purok_id")
+  purok          Purok          @relation(fields: [purokId], references: [id], onDelete: Cascade)
+  contactNumber  String         @map("contact_number")
+  registeredAt   DateTime       @map("registered_at") @db.Date
+  paymentStatus  String         @map("payment_status")
+  complianceRate Int            @default(0) @map("compliance_rate")
+  members        FamilyMember[]
+  trashLogs      TrashLog[]
+  violations     Violation[]
+  payments       Payment[]
+  users          User[]
+
+  @@index([purokId])
+  @@map("households")
+}
+
+model FamilyMember {
+  id          String    @id
+  householdId String    @map("household_id")
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  relation    String
+  age         Int
+
+  @@index([householdId])
+  @@map("family_members")
+}
+
+model TrashLog {
+  id          String    @id
+  householdId String    @map("household_id")
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  logDate     DateTime  @map("log_date") @db.Date
+  logTime     String    @map("log_time")
+  collector   String
+  status      String
+  disposedBy  String    @map("disposed_by")
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([householdId])
+  @@map("trash_logs")
+}
+
+model Violation {
+  id          String    @id
+  householdId String    @map("household_id")
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  type        String
+  vDate       DateTime  @map("v_date") @db.Date
+  isRepeat    Boolean   @default(false) @map("is_repeat")
+  notes       String    @default("")
+
+  @@index([householdId])
+  @@map("violations")
+}
+
+model Payment {
+  id          String    @id
+  householdId String    @map("household_id")
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  period      String
+  amount      Decimal   @db.Decimal(10, 2)
+  status      String
+  datePaid    DateTime? @map("date_paid") @db.Date
+  orNumber    String?   @map("or_number")
+
+  @@index([householdId])
+  @@map("payments")
+}
+
+model Notification {
+  id      String   @id
+  title   String
+  message String
+  type    String
+  nDate   DateTime @map("n_date") @db.Date
+  isRead  Boolean  @default(false) @map("is_read")
+
+  @@map("notifications")
+}
+
+model MonthlyCollectionStat {
+  ord        Int    @id
+  month      String
+  compliant  Int
+  violations Int
+  missed     Int
+
+  @@map("monthly_collection_stats")
+}
+
+model PaymentCollectionStat {
+  ord       Int    @id
+  month     String
+  collected Int
+  target    Int
+
+  @@map("payment_collection_stats")
+}
+
+model User {
+  id                  Int        @id @default(autoincrement())
+  username            String     @unique
+  passwordHash        String     @map("password_hash")
+  role                String
+  name                String
+  email               String     @unique
+  resetTokenHash      String?    @map("reset_token_hash")
+  resetTokenExpiresAt DateTime?  @map("reset_token_expires_at")
+  householdId         String?    @map("household_id")
+  household           Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  purokId             String?    @map("purok_id")
+  purok               Purok?     @relation(fields: [purokId], references: [id], onDelete: SetNull)
+  createdAt           DateTime   @default(now()) @map("created_at")
+
+  @@map("users")
+}

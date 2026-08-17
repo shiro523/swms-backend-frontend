@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #16241c;
+  --canvas: #f1f4ee;
+  --paper: #fbfcf9;
+  --panel: #e8ece2;
+  --line: #d7ddcd;
+
+  --pine: #1f5f4f;
+  --pine-dark: #123c31;
+  --pine-tint: #dfeae5;
+
+  --clay: #b8622e;
+  --clay-tint: #f4e4d7;
+
+  --azure: #2c6a86;
+  --azure-tint: #dcebf1;
+
+  --gold: #b8862c;
+  --gold-tint: #f4ecd7;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+
+  --color-pine: var(--pine);
+  --color-pine-dark: var(--pine-dark);
+  --color-pine-tint: var(--pine-tint);
+
+  --color-clay: var(--clay);
+  --color-clay-tint: var(--clay-tint);
+
+  --color-azure: var(--azure);
+  --color-azure-tint: var(--azure-tint);
+
+  --color-gold: var(--gold);
+  --color-gold-tint: var(--gold-tint);
+
+  --font-display: "Space Grotesk", "Avenir Next", "Century Gothic", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, "Courier New", monospace;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--pine-tint);
+  color: var(--pine-dark);
+}
+
+.stamp {
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ledger-row + .ledger-row {
+  border-top: 1px solid var(--line);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
