@@ -29,9 +29,19 @@ export default function AdminNotificationsPage() {
     setSending(true);
     setFeedback(null);
     try {
-      await api.createNotification({ type, message: message.trim() });
+      await api.createNotification({
+        type,
+        message: message.trim(),
+        targetPurokId: target === "all" ? undefined : target,
+      });
       setMessage("");
-      setFeedback({ ok: true, text: "Notification broadcast." });
+      setFeedback({
+        ok: true,
+        text:
+          target === "all"
+            ? "Notification broadcast to all households."
+            : `Notification sent to ${query.data?.puroks.find((p) => p.id === target)?.name ?? "the selected purok"}.`,
+      });
       query.reload();
     } catch (err) {
       setFeedback({ ok: false, text: err instanceof Error ? err.message : "Failed to send." });

@@ -2,8 +2,8 @@ import type { Request, Response } from "express";
 import { notificationService } from "@/services/notification.service";
 
 export const notificationController = {
-  async list(_req: Request, res: Response) {
-    res.json(await notificationService.list());
+  async list(req: Request, res: Response) {
+    res.json(await notificationService.list(req.user!));
   },
 
   async create(req: Request, res: Response) {

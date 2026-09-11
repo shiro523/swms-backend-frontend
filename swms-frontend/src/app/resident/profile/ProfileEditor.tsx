@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, CalendarDays } from "lucide-react";
 import { Card } from "@/components/ui/Primitives";
 import { api } from "@/lib/api";
 import type { Household } from "@/lib/types";
@@ -82,6 +82,9 @@ export function ProfileEditor({
             <span className="text-xs font-medium text-ink/50">Address</span>
             <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
           </label>
+          <p className="flex items-center gap-2 text-xs text-ink/50">
+            <CalendarDays size={13} className="text-ink/40" /> Registered {household.registeredAt}
+          </p>
         </div>
         <div className="mt-4 flex items-center gap-3">
           <button

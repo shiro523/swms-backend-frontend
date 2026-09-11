@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "swms-frontend", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "vueactivity1",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "-l", "8791", "C:\\Users\\Admin\\Desktop\\Vueactivity1"],
+      "port": 8791
     }
   ]
 }

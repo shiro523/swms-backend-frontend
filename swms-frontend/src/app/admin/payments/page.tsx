@@ -9,7 +9,7 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { Payment, PaymentStatus } from "@/lib/types";
-import { Wallet, CircleCheck, CircleX, Clock } from "lucide-react";
+import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
 const columns: Column<Payment>[] = [
   { header: "Household", accessor: (p) => (
@@ -26,7 +26,6 @@ const columns: Column<Payment>[] = [
 const FILTERS: { label: string; value: PaymentStatus | "all" }[] = [
   { label: "All", value: "all" },
   { label: "Paid", value: "paid" },
-  { label: "Pending", value: "pending" },
   { label: "Unpaid", value: "unpaid" },
 ];
 
@@ -38,7 +37,6 @@ export default function PaymentsPage() {
   const filtered = filter === "all" ? payments : payments.filter((p) => p.status === filter);
   const paid = payments.filter((p) => p.status === "paid");
   const unpaid = payments.filter((p) => p.status === "unpaid");
-  const pending = payments.filter((p) => p.status === "pending");
   const collected = paid.reduce((sum, p) => sum + p.amount, 0);
 
   return (
@@ -50,10 +48,9 @@ export default function PaymentsPage() {
         actions={<ExportButton filename="payments" rows={filtered} />}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Collected" value={`₱${collected.toLocaleString()}`} sub={`${paid.length} households paid`} icon={Wallet} tone="pine" />
         <StatCard label="Paid" value={String(paid.length)} icon={CircleCheck} tone="pine" />
-        <StatCard label="Pending" value={String(pending.length)} icon={Clock} tone="gold" />
         <StatCard label="Unpaid" value={String(unpaid.length)} icon={CircleX} tone="clay" />
       </div>
 

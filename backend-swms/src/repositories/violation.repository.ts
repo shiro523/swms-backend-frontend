@@ -10,4 +10,8 @@ export const violationRepository = {
       orderBy: { vDate: "desc" },
     });
   },
+
+  countByHousehold(householdId: string) {
+    return prisma.violation.count({ where: { householdId } });
+  },
 };

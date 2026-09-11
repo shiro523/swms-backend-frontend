@@ -22,7 +22,10 @@ export const trashLogRepository = {
   },
 
   // Inserts the trash log and — when a violation record accompanies it — the
-  // matching violations-ledger row, atomically.
+  // matching violations-ledger row, atomically. Also recomputes the
+  // household's compliance rate from its real collection history, so the
+  // number reflects what actually happened instead of staying frozen at
+  // whatever it was set to at registration.
   createWithViolation(
     logData: {
       id: string;
@@ -41,6 +44,29 @@ export const trashLogRepository = {
       if (violationData) {
         await tx.violation.create({ data: violationData });
       }
+
+      const [totalLogs, compliantLogs] = await Promise.all([
+        tx.trashLog.count({ where: { householdId: logData.householdId } }),
+        tx.trashLog.count({ where: { householdId: logData.householdId, status: "compliant" } }),
+      ]);
+      const complianceRate = totalLogs > 0 ? Math.round((compliantLogs / totalLogs) * 100) : 100;
+      const household = await tx.household.update({
+        where: { id: logData.householdId },
+        data: { complianceRate },
+        select: { purokId: true },
+      });
+
+      // The purok's own compliance figure is the average across its households
+      // — keep it in sync now that one of them just changed.
+      const purokAvg = await tx.household.aggregate({
+        where: { purokId: household.purokId },
+        _avg: { complianceRate: true },
+      });
+      await tx.purok.update({
+        where: { id: household.purokId },
+        data: { complianceRate: Math.round(purokAvg._avg.complianceRate ?? 100) },
+      });
+
       return log;
     });
   },

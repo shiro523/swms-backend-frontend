@@ -71,10 +71,9 @@ export function PurokComplianceBar({ puroks }: { puroks: Purok[] }) {
   );
 }
 
-export function PaidUnpaidPie({ paid, unpaid, pending }: { paid: number; unpaid: number; pending: number }) {
+export function PaidUnpaidPie({ paid, unpaid }: { paid: number; unpaid: number }) {
   const data = [
     { name: "Paid", value: paid, color: PINE },
-    { name: "Pending", value: pending, color: GOLD },
     { name: "Unpaid", value: unpaid, color: CLAY },
   ];
   return (

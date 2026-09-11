@@ -5,12 +5,15 @@ import { LucideIcon } from "lucide-react";
 export function Card({
   children,
   className,
+  onClick,
 }: {
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 }) {
   return (
     <div
+      onClick={onClick}
       className={clsx(
         "rounded-2xl border border-line bg-paper shadow-[0_1px_0_rgba(22,36,28,0.04)]",
         className

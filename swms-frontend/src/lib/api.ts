@@ -174,10 +174,23 @@ export const api = {
     }),
   purokAccounts: (id: string) => request<PurokAccounts>(`/puroks/${id}/accounts`),
 
+  createPayment: (input: {
+    householdId: string;
+    period: string;
+    amount: number;
+    orNumber?: string;
+    datePaid?: string;
+  }) =>
+    request<Payment>("/payments", {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+
   createNotification: (input: {
     type: "collection" | "payment" | "violation";
     message: string;
     title?: string;
+    targetPurokId?: string;
   }) =>
     request<NotificationItem>("/notifications", {
       method: "POST",

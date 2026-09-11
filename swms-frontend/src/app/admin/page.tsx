@@ -45,14 +45,13 @@ export default function AdminDashboard() {
         {({ households, payments, violations, puroks, monthly, logs }) => {
           const paid = payments.filter((p) => p.status === "paid").length;
           const unpaid = payments.filter((p) => p.status === "unpaid").length;
-          const pending = payments.filter((p) => p.status === "pending").length;
           const recentLogs = logs.slice(0, 6);
 
           return (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="Total households" value={String(households.length)} sub={`${puroks.length} puroks`} icon={Home} tone="pine" />
-                <StatCard label="Paid this period" value={String(paid)} sub={`${unpaid} unpaid · ${pending} pending`} icon={Wallet} tone="azure" />
+                <StatCard label="Paid this period" value={String(paid)} sub={`${unpaid} unpaid`} icon={Wallet} tone="azure" />
                 <StatCard label="Open violations" value={String(violations.length)} sub="Last 28 days" icon={AlertTriangle} tone="clay" />
                 <StatCard label="Avg. compliance" value="87%" sub="+3pts vs last month" icon={MapPinned} tone="gold" />
               </div>
@@ -66,7 +65,7 @@ export default function AdminDashboard() {
                 <Card className="p-5">
                   <p className="text-sm font-semibold text-ink">Paid vs. unpaid households</p>
                   <p className="text-xs text-ink/50">July 2026 collection period</p>
-                  <PaidUnpaidPie paid={paid} unpaid={unpaid} pending={pending} />
+                  <PaidUnpaidPie paid={paid} unpaid={unpaid} />
                 </Card>
               </div>
 

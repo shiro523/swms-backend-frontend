@@ -9,12 +9,14 @@ export function Modal({
   title,
   description,
   children,
+  widthClassName = "max-w-md",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   description?: string;
   children: ReactNode;
+  widthClassName?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -28,7 +30,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
       <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-line bg-paper shadow-xl">
+      <div className={`relative z-10 w-full ${widthClassName} rounded-2xl border border-line bg-paper shadow-xl`}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div>
             <p className="font-[family-name:var(--font-display)] text-base font-semibold text-ink">{title}</p>

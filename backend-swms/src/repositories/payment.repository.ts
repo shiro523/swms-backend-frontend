@@ -10,4 +10,20 @@ export const paymentRepository = {
       orderBy: { household: { code: "asc" } },
     });
   },
+
+  findById(id: string) {
+    return prisma.payment.findUnique({ where: { id }, include: PAYMENT_INCLUDE });
+  },
+
+  create(data: {
+    id: string;
+    householdId: string;
+    period: string;
+    amount: number;
+    status: string;
+    datePaid: Date;
+    orNumber: string | null;
+  }) {
+    return prisma.payment.create({ data });
+  },
 };

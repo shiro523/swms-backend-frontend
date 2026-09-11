@@ -85,6 +85,10 @@ export const householdRepository = {
     return prisma.household.update({ where: { id }, data });
   },
 
+  updatePaymentStatus(id: string, paymentStatus: string) {
+    return prisma.household.update({ where: { id }, data: { paymentStatus } });
+  },
+
   addMember(data: { id: string; householdId: string; name: string; relation: string; age: number }) {
     return prisma.familyMember.create({ data });
   },

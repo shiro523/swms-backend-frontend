@@ -9,11 +9,9 @@ import type { Household } from "@/lib/types";
 export function QrSticker({ household }: { household: Household }) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  const payload = JSON.stringify({
-    householdId: household.id,
-    code: household.code,
-    purok: household.purokName,
-  });
+  // Just the bare code — the purok-leader's scanner matches this string
+  // directly against household codes it already has loaded.
+  const payload = household.code;
 
   // Rasterize the rendered QR <svg> to a PNG and download it.
   const handleSave = () => {

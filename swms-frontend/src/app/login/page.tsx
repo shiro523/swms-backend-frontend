@@ -10,7 +10,7 @@ import { roleHome } from "@/lib/api";
 const DEMO_ACCOUNTS = [
   { label: "Admin", username: "reyinoc", password: "12345678" },
   { label: "Purok Leader", username: "crisler", password: "12345678" },
-  { label: "Resident", username: "jemarlee", password: "12345678" },
+  { label: "Resident", username: "jemar", password: "12345678" },
 ];
 
 export default function LoginPage() {

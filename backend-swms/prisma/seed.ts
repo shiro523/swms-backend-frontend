@@ -47,7 +47,7 @@ const households = Array.from({ length: 40 }).map((_, i) => {
       age: 18 + ((i + j * 7) % 50),
     })),
     registeredAt: `2025-${String(1 + (i % 12)).padStart(2, "0")}-1${i % 9}`,
-    paymentStatus: i % 5 === 0 ? "unpaid" : i % 7 === 0 ? "pending" : "paid",
+    paymentStatus: i % 5 === 0 || i % 7 === 0 ? "unpaid" : "paid",
     complianceRate: 60 + ((i * 7) % 40),
   };
 });

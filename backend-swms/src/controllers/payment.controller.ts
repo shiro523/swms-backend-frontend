@@ -6,4 +6,9 @@ export const paymentController = {
     const householdId = typeof req.query.householdId === "string" ? req.query.householdId : undefined;
     res.json(await paymentService.list(req.user!, householdId));
   },
+
+  async create(req: Request, res: Response) {
+    const payment = await paymentService.create(req.user!, req.body);
+    res.status(201).json(payment);
+  },
 };

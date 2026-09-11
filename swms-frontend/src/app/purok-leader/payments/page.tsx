@@ -47,7 +47,7 @@ export default function PurokLeaderPaymentsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Collected" value={`₱${collected.toLocaleString()}`} icon={Wallet} tone="pine" />
         <StatCard label="Paid" value={String(paid.length)} icon={CircleCheck} tone="pine" />
-        <StatCard label="Unpaid / pending" value={String(unpaid.length)} icon={CircleX} tone="clay" />
+        <StatCard label="Unpaid" value={String(unpaid.length)} icon={CircleX} tone="clay" />
       </div>
 
       <div className="mt-4">

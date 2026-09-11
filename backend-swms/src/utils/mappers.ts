@@ -98,6 +98,7 @@ export function mapNotification(n: any) {
     type: n.type,
     date: formatDate(n.nDate),
     read: n.isRead,
+    targetPurokName: n.targetPurok?.name ?? null,
   };
 }
 

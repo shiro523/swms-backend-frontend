@@ -13,12 +13,13 @@ datasource db {
 }
 
 model Purok {
-  id             String      @id
+  id             String         @id
   name           String
-  leaderName     String      @map("leader_name")
-  complianceRate Int         @default(0) @map("compliance_rate")
+  leaderName     String         @map("leader_name")
+  complianceRate Int            @default(0) @map("compliance_rate")
   households     Household[]
   users          User[]
+  notifications  Notification[]
 
   @@map("puroks")
 }
@@ -100,12 +101,14 @@ model Payment {
 }
 
 model Notification {
-  id      String   @id
-  title   String
-  message String
-  type    String
-  nDate   DateTime @map("n_date") @db.Date
-  isRead  Boolean  @default(false) @map("is_read")
+  id            String   @id
+  title         String
+  message       String
+  type          String
+  nDate         DateTime @map("n_date") @db.Date
+  isRead        Boolean  @default(false) @map("is_read")
+  targetPurokId String?  @map("target_purok_id")
+  targetPurok   Purok?   @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }

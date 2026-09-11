@@ -7,11 +7,10 @@ import { Card, PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EditHouseholdDialog } from "@/components/households/EditHouseholdDialog";
-import { RecordPaymentDialog } from "@/components/households/RecordPaymentDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 
-export default function HouseholdDetailPage() {
+export default function PurokLeaderHouseholdDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -33,7 +32,7 @@ export default function HouseholdDetailPage() {
 
   return (
     <div>
-      <Link href="/admin/households" className="flex items-center gap-1.5 text-xs font-medium text-ink/50 hover:text-pine-dark">
+      <Link href="/purok-leader/households" className="flex items-center gap-1.5 text-xs font-medium text-ink/50 hover:text-pine-dark">
         <ArrowLeft size={13} /> Back to households
       </Link>
 
@@ -47,7 +46,6 @@ export default function HouseholdDetailPage() {
               actions={
                 <div className="flex items-center gap-2">
                   <StatusBadge status={household.paymentStatus} />
-                  <RecordPaymentDialog householdId={household.id} onRecorded={() => query.reload()} />
                   <EditHouseholdDialog household={household} onUpdated={() => query.reload()} />
                 </div>
               }

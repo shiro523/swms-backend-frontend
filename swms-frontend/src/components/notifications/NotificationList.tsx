@@ -42,7 +42,9 @@ export function NotificationList({ items }: { items: NotificationItem[] }) {
                   {!isRead && <span className="h-1.5 w-1.5 rounded-full bg-clay" />}
                 </div>
                 <p className="mt-0.5 text-sm text-ink/60">{n.message}</p>
-                <p className="stamp mt-1.5 text-[10px] text-ink/35">{n.date}</p>
+                <p className="stamp mt-1.5 text-[10px] text-ink/35">
+                  {n.date} · {n.targetPurokName ?? "All households"}
+                </p>
               </div>
             </button>
           );

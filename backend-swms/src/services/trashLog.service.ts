@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { trashLogRepository } from "@/repositories/trashLog.repository";
 import { householdRepository } from "@/repositories/household.repository";
+import { violationRepository } from "@/repositories/violation.repository";
 import { mapTrashLog } from "@/utils/mappers";
 import { relationScopedWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbTodayAndTime } from "@/lib/dbTime";
@@ -37,17 +38,29 @@ export const trashLogService = {
     const notes = input.notes ?? null;
 
     // If this collection was a violation, record it in the violations ledger too.
-    const violationData =
-      input.status === "violation"
-        ? {
-            id: `v-${randomUUID()}`,
-            householdId: input.householdId,
-            type: "Improper Segregation",
-            vDate: today,
-            isRepeat: false,
-            notes: notes ?? "Violation recorded during scheduled collection.",
-          }
-        : null;
+    // A household is a "repeat offender" once it already has a prior violation
+    // on record — that also decides how this one is categorized.
+    let violationData: {
+      id: string;
+      householdId: string;
+      type: string;
+      vDate: Date;
+      isRepeat: boolean;
+      notes: string;
+    } | null = null;
+
+    if (input.status === "violation") {
+      const priorViolations = await violationRepository.countByHousehold(input.householdId);
+      const isRepeat = priorViolations > 0;
+      violationData = {
+        id: `v-${randomUUID()}`,
+        householdId: input.householdId,
+        type: isRepeat ? "Repeat Violation" : "Improper Segregation",
+        vDate: today,
+        isRepeat,
+        notes: notes ?? "Violation recorded during scheduled collection.",
+      };
+    }
 
     await trashLogRepository.createWithViolation(
       {

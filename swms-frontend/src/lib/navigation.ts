@@ -38,7 +38,7 @@ export const NAV_BY_ROLE: Record<Role, NavItem[]> = {
     { label: "Households", href: "/purok-leader/households", icon: Home },
     { label: "Payments", href: "/purok-leader/payments", icon: Wallet },
     { label: "Trash Logs", href: "/purok-leader/trash-logs", icon: ScrollText },
-    { label: "Reports", href: "/purok-leader/reports", icon: FileBarChart },
+    { label: "Violations", href: "/purok-leader/violations", icon: AlertTriangle },
     { label: "Notifications", href: "/purok-leader/notifications", icon: Bell },
   ],
   resident: [

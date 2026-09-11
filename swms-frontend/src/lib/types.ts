@@ -11,7 +11,7 @@ export interface SessionUser {
 }
 
 export type ComplianceStatus = "compliant" | "violation" | "missed";
-export type PaymentStatus = "paid" | "unpaid" | "pending";
+export type PaymentStatus = "paid" | "unpaid";
 export type ViolationType =
   | "Improper Segregation"
   | "Missed Collection"
@@ -94,4 +94,5 @@ export interface NotificationItem {
   type: "collection" | "payment" | "violation";
   date: string;
   read: boolean;
+  targetPurokName: string | null;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -12,7 +13,10 @@ import { Household } from "@/lib/types";
 
 const columns: Column<Household>[] = [
   { header: "Household", accessor: (h) => (
-      <span className="font-medium text-ink">{h.representative} <span className="stamp text-[10px] text-ink/40">{h.code}</span></span>
+      <Link href={`/purok-leader/households/${h.id}`} className="font-medium text-ink hover:text-pine-dark hover:underline">
+        {h.representative}
+        <span className="stamp ml-2 text-[10px] text-ink/40">{h.code}</span>
+      </Link>
     ) },
   { header: "Members", accessor: (h) => h.members.length },
   { header: "Contact", accessor: (h) => h.contactNumber },
