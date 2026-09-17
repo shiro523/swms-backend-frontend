@@ -2,6 +2,7 @@
 // login accounts for every role. Usage: npm run db:seed
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { assertDestructiveOpsAllowed } from "./guardDestructiveOp";
 
 // ---------------------------------------------------------------------------
 // Data generators (ported from swms-backend/scripts/seed.js so the seeded app
@@ -119,6 +120,8 @@ const paymentCollectionStats = [
 // ---------------------------------------------------------------------------
 
 async function seed() {
+  assertDestructiveOpsAllowed("db:seed");
+
   await prisma.$transaction(
     async (tx) => {
       // Wipe existing data (children first) so re-seeding is idempotent.

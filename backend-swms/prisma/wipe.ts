@@ -3,6 +3,7 @@
 // npm run db:wipe
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { assertDestructiveOpsAllowed } from "./guardDestructiveOp";
 
 const ADMIN = {
   username: "reyinoc",
@@ -12,6 +13,8 @@ const ADMIN = {
 };
 
 async function wipe() {
+  assertDestructiveOpsAllowed("db:wipe");
+
   await prisma.$transaction(
     async (tx) => {
       await tx.$executeRawUnsafe(
