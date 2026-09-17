@@ -27,6 +27,11 @@ export const paymentService = {
       throw new HttpError(404, "Household not found");
     }
 
+    const orNumber = input.orNumber || null;
+    if (orNumber && (await paymentRepository.findByOrNumber(orNumber))) {
+      throw new HttpError(400, "That OR number is already recorded on another payment.");
+    }
+
     const datePaid = input.datePaid ? new Date(input.datePaid) : await getDbToday();
     const id = `pay-${randomUUID()}`;
     await paymentRepository.create({
@@ -36,7 +41,7 @@ export const paymentService = {
       amount: input.amount,
       status: "paid",
       datePaid,
-      orNumber: input.orNumber || null,
+      orNumber,
     });
     await householdRepository.updatePaymentStatus(input.householdId, "paid");
 

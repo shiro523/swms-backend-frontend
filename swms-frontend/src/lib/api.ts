@@ -20,7 +20,7 @@ export interface MonthlyCollectionStat {
 export interface PaymentCollectionStat {
   month: string;
   collected: number;
-  target: number;
+  target: number | null;
 }
 
 export interface Account {

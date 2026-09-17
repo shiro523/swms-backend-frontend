@@ -15,6 +15,10 @@ export const paymentRepository = {
     return prisma.payment.findUnique({ where: { id }, include: PAYMENT_INCLUDE });
   },
 
+  findByOrNumber(orNumber: string) {
+    return prisma.payment.findFirst({ where: { orNumber } });
+  },
+
   create(data: {
     id: string;
     householdId: string;
