@@ -22,9 +22,30 @@ const columns: Column<TrashLog>[] = [
   { header: "Status", accessor: (t) => <StatusBadge status={t.status} /> },
 ];
 
+// Local calendar date as YYYY-MM-DD — deliberately NOT toISOString().slice(0,10),
+// which converts through UTC and shifts the date back by a day for any user
+// in a positive UTC offset (e.g. the Philippines, UTC+8) for a large part of
+// the day. Confirmed by testing under Asia/Taipei (UTC+8): toISOString()
+// made "the 1st of this month" resolve to the last day of the PREVIOUS
+// month, always — not just near midnight.
+function toLocalIso(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Defaults to "this calendar month so far" instead of a fixed date, so the
+// page never again silently defaults to a stale month.
+function currentMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: toLocalIso(first), to: toLocalIso(now) };
+}
+
 export default function TrashLogsPage() {
-  const [from, setFrom] = useState("2026-07-01");
-  const [to, setTo] = useState("2026-07-31");
+  const [from, setFrom] = useState(() => currentMonthRange().from);
+  const [to, setTo] = useState(() => currentMonthRange().to);
   const query = useApi(() => api.trashLogs(), []);
 
   const filtered = (query.data ?? []).filter((t) => t.date >= from && t.date <= to);
