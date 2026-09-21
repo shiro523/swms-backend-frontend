@@ -6,7 +6,28 @@ import { mapTrashLog } from "@/utils/mappers";
 import { relationScopedWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbTodayAndTime } from "@/lib/dbTime";
 import { HttpError } from "@/middlewares/error.middleware";
+import { Prisma } from "@/generated/prisma/client";
 import type { AuthContext } from "@/lib/token";
+
+const DUPLICATE_LOG_MESSAGE = "This household has already been logged today.";
+
+// findDuplicate() below can still lose a race to a concurrent request — the
+// database's own trash_logs_household_id_log_date_key unique index (H-5) is
+// what actually guarantees no duplicate is ever stored. This narrowly
+// translates *that specific* conflict into the same 409 the pre-check
+// already returns, instead of letting it fall through to a generic 500.
+// Deliberately narrow: must not swallow an unrelated P2002 from elsewhere.
+function isTrashLogDateConflict(err: unknown): boolean {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
+    return false;
+  }
+  const target = err.meta?.target;
+  const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
+  return (
+    targetText.includes("trash_logs_household_id_log_date_key") ||
+    (targetText.includes("household_id") && targetText.includes("log_date"))
+  );
+}
 
 interface CreateTrashLogInput {
   householdId: string;
@@ -31,7 +52,7 @@ export const trashLogService = {
 
     const dup = await trashLogRepository.findDuplicate(input.householdId, today);
     if (dup) {
-      throw new HttpError(409, "This household has already been logged today.");
+      throw new HttpError(409, DUPLICATE_LOG_MESSAGE);
     }
 
     const id = `tl-${randomUUID()}`;
@@ -62,19 +83,26 @@ export const trashLogService = {
       };
     }
 
-    await trashLogRepository.createWithViolation(
-      {
-        id,
-        householdId: input.householdId,
-        logDate: today,
-        logTime: time,
-        collector: user.name,
-        status: input.status,
-        disposedBy: input.disposedBy,
-        notes,
-      },
-      violationData,
-    );
+    try {
+      await trashLogRepository.createWithViolation(
+        {
+          id,
+          householdId: input.householdId,
+          logDate: today,
+          logTime: time,
+          collector: user.name,
+          status: input.status,
+          disposedBy: input.disposedBy,
+          notes,
+        },
+        violationData,
+      );
+    } catch (err) {
+      if (isTrashLogDateConflict(err)) {
+        throw new HttpError(409, DUPLICATE_LOG_MESSAGE);
+      }
+      throw err;
+    }
 
     const row = await trashLogRepository.findById(id);
     return mapTrashLog(row);

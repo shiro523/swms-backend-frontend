@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, CheckCircle2, ScanLine, TriangleAlert, RotateCcw, AlertCircle } from "lucide-react";
+import { Camera, CheckCircle2, ScanLine, TriangleAlert, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/Primitives";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -13,8 +13,16 @@ function normalizeCode(value: string) {
   return value.trim().toUpperCase();
 }
 
+// Local calendar date as YYYY-MM-DD — not toISOString().slice(0,10), which
+// converts through UTC and can shift the date back by a day for users in a
+// positive UTC offset (e.g. the Philippines, UTC+8). Same fix already
+// applied to admin/trash-logs/page.tsx's toLocalIso().
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default function PurokLeaderScanPage() {
@@ -25,6 +33,7 @@ export default function PurokLeaderScanPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [action, setAction] = useState<"collected" | "violation" | "note">("collected");
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [purokName, setPurokName] = useState("");
   const [logs, setLogs] = useState<TrashLog[]>([]);
@@ -188,6 +197,11 @@ export default function PurokLeaderScanPage() {
 
   async function handleAction() {
     if (!selectedHousehold) return;
+    // Guards against double-tap/rapid re-click firing two overlapping
+    // requests for the same household — the actual duplicate-prevention
+    // guarantee still has to come from the backend (see H-5), this only
+    // stops the most common way a user accidentally triggers it.
+    if (submitting) return;
 
     // A field note isn't a collection outcome — logging one would inflate the
     // household's compliance record, so we don't persist it.
@@ -199,6 +213,7 @@ export default function PurokLeaderScanPage() {
       return;
     }
 
+    setSubmitting(true);
     try {
       const created = await api.createTrashLog({
         householdId: selectedHousehold.id,
@@ -222,6 +237,8 @@ export default function PurokLeaderScanPage() {
       } else {
         setStatusMessage(err instanceof Error ? err.message : "Failed to save action.");
       }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -351,14 +368,24 @@ export default function PurokLeaderScanPage() {
                 <button
                   type="button"
                   onClick={handleAction}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark disabled:opacity-50"
                 >
-                  <CheckCircle2 size={15} /> Save action
+                  {submitting ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" /> Saving…
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} /> Save action
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={handleRescan}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink/70 hover:border-pine/40"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink/70 hover:border-pine/40 disabled:opacity-50"
                 >
                   <ScanLine size={15} /> Scan another household
                 </button>
