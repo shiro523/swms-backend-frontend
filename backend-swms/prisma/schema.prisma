@@ -147,6 +147,9 @@ model User {
   purokId             String?    @map("purok_id")
   purok               Purok?     @relation(fields: [purokId], references: [id], onDelete: SetNull)
   createdAt           DateTime   @default(now()) @map("created_at")
+  // Bumped on security-sensitive events (currently: password reset) to
+  // invalidate any previously issued JWTs — see token.ts/auth.middleware.ts.
+  tokenVersion        Int        @default(0) @map("token_version")
 
   @@map("users")
 }

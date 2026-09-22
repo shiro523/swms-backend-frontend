@@ -111,6 +111,9 @@ export function mapUser(u: any) {
     email: u.email ?? null,
     householdId: u.householdId ?? null,
     purokId: u.purokId ?? null,
+    // Needed internally by signToken(); auth.controller.ts strips this
+    // before sending the user object to the client.
+    tokenVersion: u.tokenVersion,
   };
 }
 

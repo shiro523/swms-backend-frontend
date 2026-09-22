@@ -24,10 +24,18 @@ export const userRepository = {
     });
   },
 
+  // Bumps tokenVersion in the same atomic update as the password change —
+  // any JWT issued before this moment fails authRequired()'s version check
+  // on its very next request, regardless of its expiry.
   updatePasswordAndClearReset(id: number, passwordHash: string) {
     return prisma.user.update({
       where: { id },
-      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        tokenVersion: { increment: 1 },
+      },
     });
   },
 

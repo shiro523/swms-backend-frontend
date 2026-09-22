@@ -8,7 +8,8 @@ export const authController = {
     const user = await authService.login(username.trim().toLowerCase(), password);
     const token = signToken(user);
     setAuthCookie(res, token);
-    res.json({ user });
+    const { tokenVersion: _tokenVersion, ...publicUser } = user;
+    res.json({ user: publicUser });
   },
 
   logout(_req: Request, res: Response) {
@@ -22,7 +23,8 @@ export const authController = {
       clearAuthCookie(res);
       return res.status(401).json({ error: "Session no longer valid" });
     }
-    res.json({ user });
+    const { tokenVersion: _tokenVersion, ...publicUser } = user;
+    res.json({ user: publicUser });
   },
 
   async forgotPassword(req: Request, res: Response) {

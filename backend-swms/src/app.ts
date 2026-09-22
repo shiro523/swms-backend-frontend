@@ -8,6 +8,17 @@ import { notFound, errorHandler } from "@/middlewares/error.middleware";
 
 const app = express();
 
+// `trust proxy` deliberately left at Express's default (false/off) rather
+// than changed here. The login/forgot-password rate limiters below key on
+// req.ip; behind a single reverse proxy (typical for most PaaS deploys),
+// Express would otherwise see the proxy's IP for every request and the
+// limiters would treat all users as one caller. But blindly trusting
+// X-Forwarded-For is itself a spoofing risk if the app is ever reachable
+// directly (not behind a trusted proxy) — a malicious client could set that
+// header to bypass rate limiting entirely. This depends on the actual
+// deployment topology, which isn't known at the time of this change: if you
+// deploy behind exactly one trusted reverse proxy, set
+// `app.set("trust proxy", 1)` to match that specific hop count.
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());
