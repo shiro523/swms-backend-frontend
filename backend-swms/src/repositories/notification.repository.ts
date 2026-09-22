@@ -9,6 +9,14 @@ export const notificationRepository = {
     });
   },
 
+  findById(id: string) {
+    return prisma.notification.findUnique({ where: { id }, include: { targetPurok: true } });
+  },
+
+  markRead(id: string) {
+    return prisma.notification.update({ where: { id }, data: { isRead: true }, include: { targetPurok: true } });
+  },
+
   create(data: {
     id: string;
     title: string;

@@ -39,10 +39,16 @@ export default function PaymentsPage() {
   const unpaid = payments.filter((p) => p.status === "unpaid");
   const collected = paid.reduce((sum, p) => sum + p.amount, 0);
 
+  // Derived from the actual periods present in the fetched payments —
+  // never a hardcoded/invented date.
+  const periods = Array.from(new Set(payments.map((p) => p.period)));
+  const periodEyebrow =
+    periods.length === 0 ? "Collection" : periods.length === 1 ? `${periods[0]} collection` : "All collection periods";
+
   return (
     <div>
       <PageHeader
-        eyebrow="July 2026 collection"
+        eyebrow={periodEyebrow}
         title="Payments"
         description="Monthly waste collection fee status across all households."
         actions={<ExportButton filename="payments" rows={filtered} />}

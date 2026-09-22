@@ -10,4 +10,9 @@ export const notificationController = {
     const notification = await notificationService.create(req.body);
     res.status(201).json(notification);
   },
+
+  async markRead(req: Request, res: Response) {
+    const notification = await notificationService.markRead(req.user!, String(req.params.id));
+    res.json(notification);
+  },
 };

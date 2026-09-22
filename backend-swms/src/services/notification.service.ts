@@ -3,6 +3,7 @@ import { notificationRepository } from "@/repositories/notification.repository";
 import { householdRepository } from "@/repositories/household.repository";
 import { mapNotification } from "@/utils/mappers";
 import { getDbToday } from "@/lib/dbTime";
+import { HttpError } from "@/middlewares/error.middleware";
 import type { AuthContext } from "@/lib/token";
 
 const DEFAULT_TITLE: Record<string, string> = {
@@ -50,5 +51,26 @@ export const notificationService = {
       targetPurokId: input.targetPurokId || null,
     });
     return mapNotification(row);
+  },
+
+  // Notifications aren't owned by an individual user — they're either
+  // barangay-wide or purok-targeted (see list() above). "Can this user mark
+  // it read" reuses that exact same visibility rule: you can only touch a
+  // notification you're allowed to see. Out-of-scope is reported as 404, not
+  // 403, matching canAccessHousehold()'s existing convention elsewhere.
+  async markRead(user: AuthContext, id: string) {
+    const notification = await notificationRepository.findById(id);
+    if (!notification) {
+      throw new HttpError(404, "Notification not found.");
+    }
+    if (user.role !== "admin") {
+      const purokId = await scopePurokId(user);
+      const visible = notification.targetPurokId === null || notification.targetPurokId === purokId;
+      if (!visible) {
+        throw new HttpError(404, "Notification not found.");
+      }
+    }
+    const updated = await notificationRepository.markRead(id);
+    return mapNotification(updated);
   },
 };

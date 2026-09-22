@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Truck, Wallet, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Primitives";
 import { NotificationItem } from "@/lib/types";
+import { api } from "@/lib/api";
 import clsx from "clsx";
 
 const TYPE_META = {
@@ -17,6 +18,19 @@ export function NotificationList({ items }: { items: NotificationItem[] }) {
     Object.fromEntries(items.map((n) => [n.id, n.read]))
   );
 
+  // Only flip the local "read" dot after the backend confirms the change —
+  // on failure we leave it exactly as it was rather than showing a read
+  // state that didn't actually persist.
+  const markRead = async (id: string) => {
+    if (read[id]) return;
+    try {
+      await api.markNotificationRead(id);
+      setRead((r) => ({ ...r, [id]: true }));
+    } catch {
+      // Safe no-op — notification stays visually unread so the user can retry.
+    }
+  };
+
   return (
     <Card>
       <div className="divide-y divide-line">
@@ -27,7 +41,7 @@ export function NotificationList({ items }: { items: NotificationItem[] }) {
           return (
             <button
               key={n.id}
-              onClick={() => setRead((r) => ({ ...r, [n.id]: true }))}
+              onClick={() => markRead(n.id)}
               className={clsx(
                 "flex w-full items-start gap-3 px-4 py-4 text-left transition-colors hover:bg-panel/40",
                 !isRead && "bg-pine-tint/20"

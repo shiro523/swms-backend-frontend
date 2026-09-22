@@ -13,4 +13,7 @@ router.get("/", notificationController.list);
 // POST /api/notifications — broadcast a notification (admin only)
 router.post("/", requireRole("admin"), validateBody(createNotificationSchema), notificationController.create);
 
+// PATCH /api/notifications/:id/read — mark read (only if visible to the caller)
+router.patch("/:id/read", notificationController.markRead);
+
 export default router;
