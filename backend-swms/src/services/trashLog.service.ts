@@ -5,8 +5,7 @@ import { violationRepository } from "@/repositories/violation.repository";
 import { mapTrashLog } from "@/utils/mappers";
 import { relationScopedWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbTodayAndTime } from "@/lib/dbTime";
-import { HttpError } from "@/middlewares/error.middleware";
-import { Prisma } from "@/generated/prisma/client";
+import { HttpError, isUniqueConflict } from "@/middlewares/error.middleware";
 import type { AuthContext } from "@/lib/token";
 
 const DUPLICATE_LOG_MESSAGE = "This household has already been logged today.";
@@ -18,15 +17,7 @@ const DUPLICATE_LOG_MESSAGE = "This household has already been logged today.";
 // already returns, instead of letting it fall through to a generic 500.
 // Deliberately narrow: must not swallow an unrelated P2002 from elsewhere.
 function isTrashLogDateConflict(err: unknown): boolean {
-  if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2002") {
-    return false;
-  }
-  const target = err.meta?.target;
-  const targetText = Array.isArray(target) ? target.join(",") : String(target ?? "");
-  return (
-    targetText.includes("trash_logs_household_id_log_date_key") ||
-    (targetText.includes("household_id") && targetText.includes("log_date"))
-  );
+  return isUniqueConflict(err, "trash_logs_household_id_log_date_key");
 }
 
 interface CreateTrashLogInput {
