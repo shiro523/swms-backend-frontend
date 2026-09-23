@@ -11,6 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:demo": "tsx prisma/seedDemo.ts",
     "db:wipe": "tsx prisma/wipe.ts",
     "db:reset": "npm run db:migrate && npm run db:seed"
   },

@@ -33,6 +33,7 @@ export const config = {
   isProduction,
   port: Number(process.env.PORT ?? 8000),
   frontendOrigin,
+  databaseUrl: required("DATABASE_URL", process.env.DATABASE_URL),
   jwtSecret: required("JWT_SECRET", process.env.JWT_SECRET),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   cookieSecure,
