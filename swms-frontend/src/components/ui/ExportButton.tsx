@@ -6,7 +6,7 @@ import { exportToCsv } from "@/lib/exportCsv";
 export function ExportButton<T extends object>({
   filename,
   rows,
-  label = "Export to Excel",
+  label = "Export to CSV",
 }: {
   filename: string;
   rows: T[];

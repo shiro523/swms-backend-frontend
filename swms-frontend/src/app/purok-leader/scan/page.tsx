@@ -242,10 +242,10 @@ export default function PurokLeaderScanPage() {
     }
   }
 
-  const lastCollection = selectedHousehold
+  const lastCollectionLog = selectedHousehold
     ? logs
         .filter((log) => log.householdId === selectedHousehold.id)
-        .reduce<string | null>((latest, log) => (!latest || log.date > latest ? log.date : latest), null)
+        .reduce<TrashLog | null>((latest, log) => (!latest || log.date > latest.date ? log : latest), null)
     : null;
 
   return (
@@ -330,9 +330,9 @@ export default function PurokLeaderScanPage() {
               <div className="rounded-2xl border border-line bg-paper/70 p-4 text-sm text-ink/70">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-ink">Last collection</span>
-                  <StatusBadge status={selectedHousehold.paymentStatus === "paid" ? "paid" : "unpaid"} />
+                  {lastCollectionLog && <StatusBadge status={lastCollectionLog.status} />}
                 </div>
-                <p className="mt-2 text-sm text-ink/60">{lastCollection ?? "No recent log"}</p>
+                <p className="mt-2 text-sm text-ink/60">{lastCollectionLog?.date ?? "No recent log"}</p>
               </div>
 
               {duplicateMessage && (

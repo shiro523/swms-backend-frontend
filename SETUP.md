@@ -44,15 +44,19 @@ change the JWT secret, change it in both files.**
 ## 4. Log in
 
 Open http://localhost:3000 and use a demo account (the login screen has
-click-to-fill buttons):
+click-to-fill buttons).
 
-Login now requires username, email, **and** password to all match.
+Login authenticates with **username + password** only.
 
-| Role         | Username   | Email                          | Password      |
-| ------------ | ---------- | ------------------------------- | ------------- |
-| Admin        | `admin`    | `admin@basurawatch.test`        | `admin123`    |
-| Purok Leader | `leader`   | `leader@basurawatch.test`       | `leader123`   |
-| Resident     | `resident` | `resident@basurawatch.test`     | `resident123` |
+| Role         | Username                     | Password                |
+| ------------ | ----------------------------- | ------------------------ |
+| Admin        | `ADMIN_DEMO_USERNAME`         | see local seed/demo config |
+| Purok Leader | `PUROK_LEADER_DEMO_USERNAME`  | see local seed/demo config |
+| Resident     | `RESIDENT_DEMO_USERNAME`      | see local seed/demo config |
+
+The actual demo usernames and password are set by `backend-swms/prisma/seed.ts`
+(printed to the console when you run `npm run db:seed`) — pull them from there
+or from your local `.env`/demo environment rather than from this document.
 
 ## How auth & RBAC fit together
 

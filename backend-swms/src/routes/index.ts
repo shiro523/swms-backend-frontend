@@ -10,6 +10,13 @@ import statsRoutes from "@/routes/stats.routes";
 
 const router = Router();
 
+// GET /api/health — lightweight, unauthenticated liveness check for
+// deployment platforms. No DB query: a slow/unreachable database shouldn't
+// make an otherwise-running process look unhealthy.
+router.get("/health", (_req, res) => {
+  res.json({ status: "ok" });
+});
+
 router.use("/auth", authRoutes);
 router.use("/puroks", purokRoutes);
 router.use("/households", householdRoutes);

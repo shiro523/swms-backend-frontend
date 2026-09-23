@@ -3,7 +3,7 @@ import { z } from "zod";
 const memberInput = z.object({
   name: z.string().trim().min(1),
   relation: z.string().trim().optional(),
-  age: z.coerce.number().int(),
+  age: z.coerce.number().int().min(0, "Age must be between 0 and 120.").max(120, "Age must be between 0 and 120."),
 });
 
 export const createHouseholdSchema = z.object({
@@ -31,5 +31,9 @@ export const updateHouseholdSchema = z
 export const addFamilyMemberSchema = z.object({
   name: z.string().trim().min(1, "Name and a valid age are required."),
   relation: z.string().trim().optional(),
-  age: z.coerce.number().int({ message: "Name and a valid age are required." }),
+  age: z.coerce
+    .number()
+    .int({ message: "Name and a valid age are required." })
+    .min(0, "Age must be between 0 and 120.")
+    .max(120, "Age must be between 0 and 120."),
 });

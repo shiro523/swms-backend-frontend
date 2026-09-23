@@ -3,3 +3,6 @@ node_modules
 .env
 
 /src/generated/prisma
+
+# Agent/tool skill reference docs (auto-installed, unrelated to the app itself)
+.agents/
