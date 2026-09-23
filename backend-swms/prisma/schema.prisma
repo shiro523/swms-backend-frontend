@@ -97,6 +97,7 @@ model Payment {
   datePaid    DateTime? @map("date_paid") @db.Date
   orNumber    String?   @map("or_number")
 
+  @@unique([householdId, period])
   @@index([householdId])
   @@map("payments")
 }

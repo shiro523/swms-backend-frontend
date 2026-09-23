@@ -5,7 +5,7 @@ import { userRepository } from "@/repositories/user.repository";
 import { mapHousehold, mapFamilyMember } from "@/utils/mappers";
 import { householdScopeWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbToday } from "@/lib/dbTime";
-import { HttpError } from "@/middlewares/error.middleware";
+import { HttpError, isUniqueConflict } from "@/middlewares/error.middleware";
 import type { AuthContext } from "@/lib/token";
 
 interface CreateHouseholdInput {
@@ -87,17 +87,32 @@ export const householdService = {
       })
       .filter((m): m is { id: string; name: string; relation: string; age: number } => m !== null);
 
-    await householdRepository.createWithMembers({
-      id,
-      code,
-      representative: input.representative,
-      address: input.address,
-      purokId,
-      contactNumber: input.contactNumber,
-      registeredAt: today,
-      members,
-      user: { username, passwordHash, email, name: input.representative },
-    });
+    try {
+      await householdRepository.createWithMembers({
+        id,
+        code,
+        representative: input.representative,
+        address: input.address,
+        purokId,
+        contactNumber: input.contactNumber,
+        registeredAt: today,
+        members,
+        user: { username, passwordHash, email, name: input.representative },
+      });
+    } catch (err) {
+      // The pre-checks above narrow the common case; these catch the rare
+      // race where another request wins between check and insert.
+      if (isUniqueConflict(err, "households_code_key")) {
+        throw new HttpError(409, "A household code conflict occurred. Please try again.");
+      }
+      if (isUniqueConflict(err, "users_username_key")) {
+        throw new HttpError(409, "That username is already taken.");
+      }
+      if (isUniqueConflict(err, "users_email_key")) {
+        throw new HttpError(409, "That email is already registered.");
+      }
+      throw err;
+    }
 
     return getById(user, id, true);
   },

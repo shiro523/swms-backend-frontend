@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { notificationRepository } from "@/repositories/notification.repository";
 import { householdRepository } from "@/repositories/household.repository";
+import { purokRepository } from "@/repositories/purok.repository";
 import { mapNotification } from "@/utils/mappers";
 import { getDbToday } from "@/lib/dbTime";
 import { HttpError } from "@/middlewares/error.middleware";
@@ -39,6 +40,9 @@ export const notificationService = {
   },
 
   async create(input: { type: "collection" | "payment" | "violation"; message: string; title?: string; targetPurokId?: string }) {
+    if (input.targetPurokId && !(await purokRepository.findById(input.targetPurokId))) {
+      throw new HttpError(400, "That purok does not exist.");
+    }
     const title = input.title?.trim() || DEFAULT_TITLE[input.type];
     const today = await getDbToday();
     const id = `n-${randomUUID().slice(0, 8)}`;

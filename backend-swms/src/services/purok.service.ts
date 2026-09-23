@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { purokRepository } from "@/repositories/purok.repository";
 import { userRepository } from "@/repositories/user.repository";
 import { mapPurok, mapAccount } from "@/utils/mappers";
-import { HttpError } from "@/middlewares/error.middleware";
+import { HttpError, isUniqueConflict } from "@/middlewares/error.middleware";
 import type { AuthContext } from "@/lib/token";
 
 export const purokService = {
@@ -33,13 +33,26 @@ export const purokService = {
     const passwordHash = await bcrypt.hash(input.password, 10);
 
     const id = `p-${randomUUID().slice(0, 8)}`;
-    await purokRepository.createWithLeader({
-      id,
-      name: input.name,
-      leaderName: input.leaderName,
-      complianceRate: input.complianceRate,
-      user: { username, passwordHash, email },
-    });
+    try {
+      await purokRepository.createWithLeader({
+        id,
+        name: input.name,
+        leaderName: input.leaderName,
+        complianceRate: input.complianceRate,
+        user: { username, passwordHash, email },
+      });
+    } catch (err) {
+      // The pre-checks above narrow the common case; these catch the rare
+      // race where another request wins between check and insert. (Purok
+      // itself has no unique constraint beyond its generated id.)
+      if (isUniqueConflict(err, "users_username_key")) {
+        throw new HttpError(409, "That username is already taken.");
+      }
+      if (isUniqueConflict(err, "users_email_key")) {
+        throw new HttpError(409, "That email is already registered.");
+      }
+      throw err;
+    }
     const row = await purokRepository.findByIdWithCount(id);
     return mapPurok(row);
   },
