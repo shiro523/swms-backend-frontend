@@ -1,12 +1,22 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import helmet from "helmet";
 import morgan from "morgan";
 import { config } from "@/config/env";
 import apiRoutes from "@/routes/index";
 import { notFound, errorHandler } from "@/middlewares/error.middleware";
 
 const app = express();
+
+// Sensible default security headers. CSP is left at Helmet's default (not
+// customized or disabled) — it's inert either way, since every response here
+// is JSON, never HTML a browser would render/execute. HSTS is the one
+// setting explicitly gated on production: browsers already ignore it over
+// plain HTTP by spec, but this makes that intent explicit rather than
+// relying on that nuance, matching how cookieSecure/frontendOrigin below are
+// already conditioned on config.isProduction.
+app.use(helmet({ hsts: config.isProduction }));
 
 // `trust proxy` deliberately left at Express's default (false/off) rather
 // than changed here. The login/forgot-password rate limiters below key on

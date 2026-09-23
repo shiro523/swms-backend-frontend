@@ -112,6 +112,7 @@ model Notification {
   targetPurokId String?  @map("target_purok_id")
   targetPurok   Purok?   @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
 
+  @@index([targetPurokId])
   @@map("notifications")
 }
 
@@ -152,5 +153,7 @@ model User {
   // invalidate any previously issued JWTs — see token.ts/auth.middleware.ts.
   tokenVersion        Int        @default(0) @map("token_version")
 
+  @@index([householdId])
+  @@index([purokId])
   @@map("users")
 }
