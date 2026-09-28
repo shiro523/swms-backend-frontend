@@ -32,6 +32,10 @@ export default function PurokLeaderScanPage() {
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [action, setAction] = useState<"collected" | "violation" | "note">("collected");
+  // No default — the leader must explicitly pick who disposed of the trash
+  // rather than silently falling back to the backend's "representative"
+  // default, which could record an incorrect person for every scan.
+  const [disposedBy, setDisposedBy] = useState<"owner" | "representative" | null>(null);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -166,6 +170,7 @@ export default function PurokLeaderScanPage() {
     setCameraError(null);
     setNote("");
     setAction("collected");
+    setDisposedBy(null);
 
     const html5QrCode = scannerRef.current;
     if (!html5QrCode) return;
@@ -213,11 +218,17 @@ export default function PurokLeaderScanPage() {
       return;
     }
 
+    // Require an explicit disposer choice — never silently fall through to
+    // the backend's default. The "Save action" button is already disabled
+    // in this state; this is a defensive backstop.
+    if (!disposedBy) return;
+
     setSubmitting(true);
     try {
       const created = await api.createTrashLog({
         householdId: selectedHousehold.id,
         status: action === "violation" ? "violation" : "compliant",
+        disposedBy,
         notes: note || undefined,
       });
 
@@ -229,6 +240,7 @@ export default function PurokLeaderScanPage() {
       setStatusMessage(`Logged ${action === "violation" ? "violation" : "collection"} for ${selectedHousehold.code}.`);
       setDuplicateMessage(null);
       setNote("");
+      setDisposedBy(null);
     } catch (err) {
       setScannerState("error");
       if (err instanceof ApiError && err.status === 409) {
@@ -359,6 +371,31 @@ export default function PurokLeaderScanPage() {
                     </button>
                   ))}
                 </div>
+
+                {action !== "note" && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-sm font-semibold text-ink">Who disposed of the trash?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: "owner", label: "Household Representative" },
+                        { key: "representative", label: "Family Member / Other Person" },
+                      ].map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setDisposedBy(option.key as "owner" | "representative")}
+                          className={`rounded-full border px-3 py-1.5 text-sm ${disposedBy === option.key ? "border-pine bg-pine-tint text-pine-dark" : "border-line bg-paper text-ink/65"}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    {!disposedBy && (
+                      <p className="text-xs text-clay">Select who disposed of the trash to continue.</p>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
@@ -368,7 +405,7 @@ export default function PurokLeaderScanPage() {
                 <button
                   type="button"
                   onClick={handleAction}
-                  disabled={submitting}
+                  disabled={submitting || (action !== "note" && !disposedBy)}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark disabled:opacity-50"
                 >
                   {submitting ? (
