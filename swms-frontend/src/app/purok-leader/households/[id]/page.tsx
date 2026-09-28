@@ -7,6 +7,7 @@ import { Card, PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EditHouseholdDialog } from "@/components/households/EditHouseholdDialog";
+import { RecordPaymentDialog } from "@/components/households/RecordPaymentDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 
@@ -46,6 +47,7 @@ export default function PurokLeaderHouseholdDetailPage() {
               actions={
                 <div className="flex items-center gap-2">
                   <StatusBadge status={household.paymentStatus} />
+                  <RecordPaymentDialog householdId={household.id} onRecorded={() => query.reload()} />
                   <EditHouseholdDialog household={household} onUpdated={() => query.reload()} />
                 </div>
               }

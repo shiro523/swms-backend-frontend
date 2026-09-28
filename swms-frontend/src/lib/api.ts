@@ -105,6 +105,7 @@ export const api = {
   household: (id: string) => request<Household>(`/households/${id}`),
   trashLogs: (householdId?: string) => request<TrashLog[]>(`/trash-logs${qs(householdId)}`),
   payments: (householdId?: string) => request<Payment[]>(`/payments${qs(householdId)}`),
+  currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
   notifications: () => request<NotificationItem[]>("/notifications"),
   markNotificationRead: (id: string) =>

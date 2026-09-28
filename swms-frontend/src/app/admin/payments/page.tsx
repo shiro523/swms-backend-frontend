@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 import { Payment, PaymentStatus } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
@@ -31,19 +32,38 @@ const FILTERS: { label: string; value: PaymentStatus | "all" }[] = [
 
 export default function PaymentsPage() {
   const [filter, setFilter] = useState<PaymentStatus | "all">("all");
-  const query = useApi(() => api.payments(), []);
-  const payments = query.data ?? [];
+  const query = useApi(
+    () =>
+      Promise.all([api.households(), api.payments(), api.currentPaymentPeriod()]).then(
+        ([households, payments, currentPeriod]) => ({ households, payments, currentPeriod: currentPeriod.period }),
+      ),
+    [],
+  );
+  const households = query.data?.households ?? [];
+  const payments = query.data?.payments ?? [];
+  const currentPeriod = query.data?.currentPeriod ?? "";
 
-  const filtered = filter === "all" ? payments : payments.filter((p) => p.status === filter);
-  const paid = payments.filter((p) => p.status === "paid");
-  const unpaid = payments.filter((p) => p.status === "unpaid");
-  const collected = paid.reduce((sum, p) => sum + p.amount, 0);
+  // Paid/unpaid for the current billing period, derived from actual Payment
+  // records — never from Payment.status (always "paid", not period-aware)
+  // or Household.paymentStatus (means "ever paid," not "paid this period").
+  const { paidHouseholdIds, paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(
+    households,
+    payments,
+    currentPeriod,
+  );
 
-  // Derived from the actual periods present in the fetched payments —
-  // never a hardcoded/invented date.
-  const periods = Array.from(new Set(payments.map((p) => p.period)));
-  const periodEyebrow =
-    periods.length === 0 ? "Collection" : periods.length === 1 ? `${periods[0]} collection` : "All collection periods";
+  // The All/Paid/Unpaid toggle now filters payment rows by whether their
+  // household is paid/unpaid for the current period, instead of the row's
+  // own (always-"paid") status.
+  const filtered =
+    filter === "all"
+      ? payments
+      : filter === "paid"
+        ? payments.filter((p) => paidHouseholdIds.has(p.householdId))
+        : payments.filter((p) => !paidHouseholdIds.has(p.householdId));
+
+  const collected = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
+  const periodEyebrow = currentPeriod ? `${currentPeriod} collection` : "Collection";
 
   return (
     <div>
@@ -55,9 +75,9 @@ export default function PaymentsPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Collected" value={`₱${collected.toLocaleString()}`} sub={`${paid.length} households paid`} icon={Wallet} tone="pine" />
-        <StatCard label="Paid" value={String(paid.length)} icon={CircleCheck} tone="pine" />
-        <StatCard label="Unpaid" value={String(unpaid.length)} icon={CircleX} tone="clay" />
+        <StatCard label="Collected (all time)" value={`₱${collected.toLocaleString()}`} sub={`${paidHouseholds.length} households paid this period`} icon={Wallet} tone="pine" />
+        <StatCard label="Paid this period" value={String(paidHouseholds.length)} icon={CircleCheck} tone="pine" />
+        <StatCard label="Unpaid this period" value={String(unpaidHouseholds.length)} icon={CircleX} tone="clay" />
       </div>
 
       <div className="my-4 flex gap-2">
