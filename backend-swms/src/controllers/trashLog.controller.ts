@@ -11,4 +11,8 @@ export const trashLogController = {
     const log = await trashLogService.create(req.user!, req.body);
     res.status(201).json(log);
   },
+
+  async getById(req: Request, res: Response) {
+    res.json(await trashLogService.getById(req.user!, String(req.params.id)));
+  },
 };

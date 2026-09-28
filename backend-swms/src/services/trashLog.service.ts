@@ -33,6 +33,17 @@ export const trashLogService = {
     return rows.map(mapTrashLog);
   },
 
+  async getById(user: AuthContext, id: string) {
+    const row = await trashLogRepository.findById(id);
+    // Same generic 404 whether the row doesn't exist or exists but is out of
+    // this user's scope — never reveals which, matching every other
+    // single-record lookup in this app (see household.service.ts's getById).
+    if (!row || !canAccessHousehold(user, row.household)) {
+      throw new HttpError(404, "TrashLog not found");
+    }
+    return mapTrashLog(row);
+  },
+
   async create(user: AuthContext, input: CreateTrashLogInput) {
     const household = await householdRepository.findRawById(input.householdId);
     if (!canAccessHousehold(user, household)) {

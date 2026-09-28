@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -14,7 +15,10 @@ const columns: Column<TrashLog>[] = [
   { header: "Date", accessor: (t) => t.date },
   { header: "Time", accessor: (t) => t.time },
   { header: "Household", accessor: (t) => (
-      <span className="font-medium text-ink">{t.representative} <span className="stamp text-[10px] text-ink/40">{t.householdCode}</span></span>
+      <Link href={`/admin/trash-logs/${t.id}`} className="font-medium text-ink hover:text-pine-dark hover:underline">
+        {t.representative}
+        <span className="stamp ml-2 text-[10px] text-ink/40">{t.householdCode}</span>
+      </Link>
     ) },
   { header: "Purok", accessor: (t) => t.purokName },
   { header: "Collector", accessor: (t) => t.collector },

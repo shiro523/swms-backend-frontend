@@ -104,6 +104,7 @@ export const api = {
   households: () => request<Household[]>("/households"),
   household: (id: string) => request<Household>(`/households/${id}`),
   trashLogs: (householdId?: string) => request<TrashLog[]>(`/trash-logs${qs(householdId)}`),
+  trashLog: (id: string) => request<TrashLog>(`/trash-logs/${id}`),
   payments: (householdId?: string) => request<Payment[]>(`/payments${qs(householdId)}`),
   currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
