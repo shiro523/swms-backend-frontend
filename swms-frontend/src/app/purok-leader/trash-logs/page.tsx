@@ -5,9 +5,28 @@ import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
+import type { XlsxColumn } from "@/lib/exportXlsx";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { TrashLog } from "@/lib/types";
+
+const DISPOSED_BY_LABEL: Record<TrashLog["disposedBy"], string> = {
+  owner: "Household Representative",
+  representative: "Family Member / Other Person",
+};
+
+const xlsxColumns: XlsxColumn<TrashLog>[] = [
+  { header: "Household", accessor: (t) => t.representative },
+  { header: "Household Code", accessor: (t) => t.householdCode },
+  { header: "Household ID", accessor: (t) => t.householdId },
+  { header: "Purok", accessor: (t) => t.purokName },
+  { header: "Date", accessor: (t) => t.date },
+  { header: "Time", accessor: (t) => t.time },
+  { header: "Status", accessor: (t) => t.status },
+  { header: "Disposed By", accessor: (t) => DISPOSED_BY_LABEL[t.disposedBy] },
+  { header: "Collector", accessor: (t) => t.collector },
+  { header: "Notes", accessor: (t) => t.notes ?? "" },
+];
 
 const columns: Column<TrashLog>[] = [
   { header: "Date", accessor: (t) => t.date },
@@ -37,7 +56,11 @@ export default function PurokLeaderTrashLogsPage() {
         eyebrow={query.data?.purok?.name ?? "Your purok"}
         title="Trash logs"
         description="Collection scans recorded for households in your purok."
-        actions={trashLogs.length > 0 ? <ExportButton filename="my-trash-logs" rows={trashLogs} /> : undefined}
+        actions={
+          trashLogs.length > 0 ? (
+            <ExportButton filename="my-trash-logs" rows={trashLogs} format="xlsx" columns={xlsxColumns} />
+          ) : undefined
+        }
       />
       <AsyncSection query={query}>
         {({ trashLogs }) => (

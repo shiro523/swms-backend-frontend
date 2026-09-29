@@ -5,12 +5,29 @@ import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
+import type { XlsxColumn } from "@/lib/exportXlsx";
 import { RecordPaymentDialog } from "@/components/households/RecordPaymentDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 import { Payment } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
+
+const xlsxColumns: XlsxColumn<Payment>[] = [
+  { header: "Household", accessor: (p) => p.representative },
+  { header: "Household Code", accessor: (p) => p.householdCode },
+  { header: "Household ID", accessor: (p) => p.householdId },
+  { header: "Purok", accessor: (p) => p.purokName },
+  { header: "Period", accessor: (p) => p.period },
+  { header: "Amount", accessor: (p) => p.amount, numFmt: '"₱"#,##0.00' },
+  { header: "Date Paid", accessor: (p) => p.datePaid ?? "" },
+  { header: "Status", accessor: (p) => p.status },
+  // Forced text via a leading apostrophe cue is unnecessary here — writing a
+  // plain string value already yields a text cell in exceljs, never a
+  // numeric one, so OR numbers keep leading zeros and never render in
+  // scientific notation.
+  { header: "OR Number", accessor: (p) => p.orNumber ?? "" },
+];
 
 const columns: Column<Payment>[] = [
   { header: "Household", accessor: (p) => (
@@ -49,7 +66,11 @@ export default function PurokLeaderPaymentsPage() {
         eyebrow={query.data?.purok?.name ?? "Your purok"}
         title="Payments"
         description={currentPeriod ? `Monthly collection fee status for ${currentPeriod}.` : "Monthly collection fee status for households in your purok."}
-        actions={payments.length > 0 ? <ExportButton filename="my-payments" rows={payments} /> : undefined}
+        actions={
+          payments.length > 0 ? (
+            <ExportButton filename="my-payments" rows={payments} format="xlsx" columns={xlsxColumns} />
+          ) : undefined
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
