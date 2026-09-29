@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { authService } from "@/services/auth.service";
 import { signToken, setAuthCookie, clearAuthCookie } from "@/lib/token";
+import { config } from "@/config/env";
 
 export const authController = {
   async login(req: Request, res: Response) {
@@ -12,7 +13,18 @@ export const authController = {
     res.json({ user: publicUser });
   },
 
-  logout(_req: Request, res: Response) {
+  // Batch J: invalidates the calling user's current session server-side
+  // (via tokenVersion) whenever a valid one is actually found, before
+  // clearing the cookie — never the other way around, so a genuine DB
+  // failure during the invalidation step is never masked by a cookie that's
+  // already gone and a response that already claimed success. Deliberately
+  // NOT gated behind authRequired: this endpoint has always succeeded
+  // regardless of auth state (no cookie, expired token, etc.), and keeping
+  // that exact contract avoids a new failure mode for the frontend's
+  // existing unconditional logout→redirect flow.
+  async logout(req: Request, res: Response) {
+    const token = req.cookies?.[config.cookieName];
+    await authService.logout(token);
     clearAuthCookie(res);
     res.json({ ok: true });
   },

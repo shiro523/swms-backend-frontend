@@ -42,6 +42,16 @@ export const userRepository = {
     });
   },
 
+  // Same tokenVersion-bump idiom as above, but on its own — logout (Batch J)
+  // only ever needs to invalidate existing sessions, never touches
+  // passwordHash/resetToken fields the way a password reset does.
+  incrementTokenVersion(id: number) {
+    return prisma.user.update({
+      where: { id },
+      data: { tokenVersion: { increment: 1 } },
+    });
+  },
+
   findLeaderByPurokId(purokId: string) {
     return prisma.user.findFirst({ where: { role: "purok-leader", purokId } });
   },
