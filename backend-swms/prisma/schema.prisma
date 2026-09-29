@@ -112,6 +112,11 @@ model Payment {
   orNumber    String?   @map("or_number")
 
   @@unique([householdId, period])
+  // DB-level backstop for the pre-existing application check in
+  // payment.service.ts (Batch I) — Postgres allows multiple NULLs under a
+  // unique constraint, so households paying without recording an OR number
+  // are unaffected; only two non-null rows sharing the same number collide.
+  @@unique([orNumber])
   @@index([householdId])
   @@map("payments")
 }

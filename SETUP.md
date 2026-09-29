@@ -1,13 +1,13 @@
 # Basura Watch — Full Setup
 
-The app is now two services:
+The app is two services:
 
 - **`backend-swms/`** — Express + Prisma + PostgreSQL API (auth + data)
 - **`swms-frontend/`** — Next.js UI (proxies `/api/*` to the backend)
 
-The mock data is gone; every screen reads from the database, and login is real
-(username + password, hashed with bcrypt, JWT in an httpOnly cookie) with
-role-based access control for `admin`, `purok-leader`, and `resident`.
+Every screen reads from the database, and login is real (username + password,
+hashed with bcrypt, JWT in an httpOnly cookie) with role-based access control
+for `admin`, `purok-leader`, and `resident`.
 
 ## 1. Database — already configured (Neon)
 
@@ -68,10 +68,103 @@ or from your local `.env`/demo environment rather than from this document.
    scopes each query — a resident only ever receives their own household's data,
    a leader only their purok. **This is the real security boundary.**
 
-## Also fixed in this pass
+## Feature overview
 
-- **QR "Print sticker"** now prints the QR sticker itself (it was hidden by a
-  `no-print` class before, so only the instructions printed).
-- **Hydration mismatch** from reading the session during render is gone — the
-  session is resolved after mount via `/api/auth/me`.
-- **Mobile nav** no longer highlights "Dashboard" on every sub-page.
+**Households & residents** — Purok Leaders register households (with family
+members and a resident login account) under their own purok; Admin sees and
+manages all of them.
+
+**QR trash collection** — Purok Leaders scan a household's QR code to log a
+collection as compliant, a violation, or missed, and record who physically
+disposed of the trash (the household's own representative, or a family
+member/other person). Only one trash log is allowed per household per
+calendar date — enforced by both a pre-check and a database unique
+constraint, so a retried or concurrent duplicate scan is rejected cleanly
+rather than silently double-counted.
+
+**Violations & repeat-offense tracking** — A violation-status trash log
+automatically creates a violation record in the same transaction. A household
+is flagged as a repeat offender the moment it already has *any* prior
+violation on record (regardless of whether that earlier violation was later
+completed — completed violations still count toward this).
+
+**Violation lifecycle (Active → Completed)** — Admin and Purok Leaders can
+mark a violation as completed once the household has corrected the behavior
+and staff has closed the record. Completed violations are never deleted —
+they remain permanently visible as history (to Admin, the relevant Purok
+Leader, and the affected resident) alongside their completion date and which
+staff member closed them. Residents can view both active and completed
+violations but cannot change a violation's status themselves.
+
+**Notifications** — Household-specific and purok-wide (leader-only or
+resident-visible) notifications are created automatically for real events:
+a new violation notifies both the affected resident and the purok leader; a
+completed violation notifies the resident. Read state is tracked per user,
+so one person reading a shared notification doesn't mark it read for anyone
+else.
+
+**Payments** — Purok Leaders and Admin record payments against a household
+for a billing period (e.g. "September 2026"). "Paid/unpaid for the current
+period" is always derived by matching real payment records against the
+server's own current-period definition — never from a client clock or a
+static stored flag. OR numbers, where recorded, are validated for
+uniqueness both on submission and at the database level, so two payments can
+never end up sharing the same receipt number even under a race.
+
+**Purok archive/restore** — Admin can archive a purok (its leader's
+operational access is suspended, but residents and historical data are
+completely unaffected) and restore it within a 30-day window. Permanent
+deletion is only ever allowed after that window has passed and the purok has
+zero remaining households, accounts, or notifications referencing it —
+nothing is ever cascade-deleted.
+
+**Admin Settings** — a single, admin-only system-wide record (barangay name,
+municipality, contact number, monthly collection fee, collection days,
+collection time). The monthly fee feeds the admin payment-collection
+statistics; the other fields are informational.
+
+**Exports** — Admin can export households, trash logs, payments, and
+violations to CSV. Purok Leaders export their own trash logs, violations,
+and payments as genuine `.xlsx` Excel workbooks (not renamed CSV), with a
+frozen header row, sensible column widths, and — for violations —
+completion status and date included alongside the original fields.
+
+## Environment variables
+
+Both services ship a documented `.env.example` (`backend-swms/.env.example`,
+`swms-frontend/.env.example`) — copy each to `.env` / `.env.local` and fill in
+real values. The comments in those files explain what each variable does and
+its security implications (CORS origin, cookie `Secure` flag, the JWT secret
+shared between both services, the SMTP settings used for password-reset
+email, and the explicit opt-in guards required before the destructive
+`db:wipe` or `db:seed:demo` scripts will run). **Never commit a real `.env`
+or `.env.local` file** — both are already gitignored.
+
+## Database migrations
+
+Schema changes live in `backend-swms/prisma/migrations/`, applied in order
+via `npm run db:migrate` (development) or `prisma migrate deploy` (any other
+environment). Every migration in this project has been generated, manually
+inspected for safety, and applied one at a time — none are destructive to
+existing data; some add columns with safe defaults, none drop or rewrite
+existing rows.
+
+## Security notes
+
+- Passwords are hashed with bcrypt; JWTs are signed and stored in an
+  `httpOnly`, `SameSite=Lax` cookie (`Secure` in production).
+- Every API route re-derives its own authorization/scope from the verified
+  session on every request — the frontend's route guarding is a UX
+  convenience only, never the actual security boundary.
+- Login and forgot-password are rate-limited per IP; other endpoints require
+  authentication first.
+- Logging out clears the session cookie but does not revoke the underlying
+  token server-side before its normal expiry — a known tradeoff of this
+  project's stateless-JWT design, not an oversight.
+
+## Known limitations
+
+- No automated test suite exists yet; verification has been manual and
+  live, batch by batch, throughout development.
+- `swms-frontend/README.md` is still the default `create-next-app`
+  boilerplate — this file is the project's real setup documentation.

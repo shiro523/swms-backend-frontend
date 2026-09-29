@@ -86,6 +86,14 @@ export const paymentService = {
       if (isUniqueConflict(err, "payments_household_id_period_key")) {
         throw new HttpError(409, "This household already has a payment record for this period.");
       }
+      // Backstops the pre-check above (Batch I): two requests with the same
+      // OR number can both pass findByOrNumber() before either commits — the
+      // DB constraint is what actually prevents the second insert, and this
+      // translates that race into the exact same response the pre-check
+      // already gives a non-racing duplicate, instead of a generic 500.
+      if (isUniqueConflict(err, "payments_or_number_key")) {
+        throw new HttpError(400, "That OR number is already recorded on another payment.");
+      }
       throw err;
     }
     await householdRepository.updatePaymentStatus(input.householdId, "paid");
