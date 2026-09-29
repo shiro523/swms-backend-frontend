@@ -101,7 +101,9 @@ export function mapNotification(n: any) {
     message: n.message,
     type: n.type,
     date: formatDate(n.nDate),
-    read: n.isRead,
+    // Per-user read state (Batch E) — `reads` is pre-filtered by the
+    // repository to just the current viewer's own row, if any.
+    read: (n.reads?.length ?? 0) > 0,
     targetPurokName: n.targetPurok?.name ?? null,
   };
 }

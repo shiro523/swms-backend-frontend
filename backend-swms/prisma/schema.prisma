@@ -43,6 +43,7 @@ model Household {
   violations     Violation[]
   payments       Payment[]
   users          User[]
+  notifications  Notification[]
 
   @@index([purokId])
   @@map("households")
@@ -106,17 +107,45 @@ model Payment {
 }
 
 model Notification {
-  id            String   @id
-  title         String
-  message       String
-  type          String
-  nDate         DateTime @map("n_date") @db.Date
-  isRead        Boolean  @default(false) @map("is_read")
-  targetPurokId String?  @map("target_purok_id")
-  targetPurok   Purok?   @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
+  id                String             @id
+  title             String
+  message           String
+  type              String
+  nDate             DateTime           @map("n_date") @db.Date
+  targetPurokId     String?            @map("target_purok_id")
+  targetPurok       Purok?             @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
+  targetHouseholdId String?            @map("target_household_id")
+  targetHousehold   Household?         @relation(fields: [targetHouseholdId], references: [id], onDelete: Cascade)
+  // Distinguishes, within a purok-wide notification, an Admin announcement
+  // meant for that purok's residents too (false, the default — restores the
+  // pre-Batch-E behavior for every existing row) from an automatic
+  // violation leader-alert meant for the purok leader only (true), which
+  // must never reach the unrelated resident whose household wasn't involved
+  // (Batch E correction).
+  leaderOnly        Boolean            @default(false) @map("leader_only")
+  reads             NotificationRead[]
 
   @@index([targetPurokId])
+  @@index([targetHouseholdId])
   @@map("notifications")
+}
+
+// Per-user read state — replaces the old shared Notification.isRead boolean
+// (Batch E). A row's presence means that specific user has read that specific
+// notification; its absence means unread, for that user only. The composite
+// PK is both the uniqueness guarantee and the natural upsert key.
+model NotificationRead {
+  notificationId String       @map("notification_id")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  userId         Int          @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  readAt         DateTime     @default(now()) @map("read_at")
+
+  @@id([notificationId, userId])
+  @@index([userId])
+  @@map("notification_reads")
 }
 
 model MonthlyCollectionStat {
@@ -155,6 +184,7 @@ model User {
   // Bumped on security-sensitive events (currently: password reset) to
   // invalidate any previously issued JWTs — see token.ts/auth.middleware.ts.
   tokenVersion        Int        @default(0) @map("token_version")
+  notificationReads   NotificationRead[]
 
   @@index([householdId])
   @@index([purokId])

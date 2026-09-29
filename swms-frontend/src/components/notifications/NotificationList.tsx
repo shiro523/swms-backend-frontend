@@ -31,6 +31,14 @@ export function NotificationList({ items }: { items: NotificationItem[] }) {
     }
   };
 
+  if (items.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-line py-16 text-center text-sm text-ink/40">
+        No notifications yet.
+      </div>
+    );
+  }
+
   return (
     <Card>
       <div className="divide-y divide-line">

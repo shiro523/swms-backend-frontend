@@ -98,6 +98,7 @@ export const trashLogService = {
           notes,
         },
         violationData,
+        { purokId: household!.purokId, code: household!.code },
       );
     } catch (err) {
       if (isTrashLogDateConflict(err)) {

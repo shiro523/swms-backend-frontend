@@ -67,15 +67,18 @@ export const paymentService = {
     const datePaid = input.datePaid ? new Date(input.datePaid) : await getDbToday();
     const id = `pay-${randomUUID()}`;
     try {
-      await paymentRepository.create({
-        id,
-        householdId: input.householdId,
-        period: input.period,
-        amount: input.amount,
-        status: "paid",
-        datePaid,
-        orNumber,
-      });
+      await paymentRepository.createWithNotification(
+        {
+          id,
+          householdId: input.householdId,
+          period: input.period,
+          amount: input.amount,
+          status: "paid",
+          datePaid,
+          orNumber,
+        },
+        { message: `Payment of ₱${input.amount.toFixed(2)} recorded for ${input.period}.`, nDate: datePaid },
+      );
     } catch (err) {
       // Inert until the household+period unique constraint is approved and
       // migrated (see C4); wired up now so it takes effect the moment that

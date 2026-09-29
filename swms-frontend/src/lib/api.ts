@@ -111,6 +111,7 @@ export const api = {
   notifications: () => request<NotificationItem[]>("/notifications"),
   markNotificationRead: (id: string) =>
     request<NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }),
+  unreadNotificationCount: () => request<{ count: number }>("/notifications/unread-count"),
   monthlyCollectionStats: () => request<MonthlyCollectionStat[]>("/stats/monthly-collection"),
   paymentCollectionStats: () => request<PaymentCollectionStat[]>("/stats/payment-collection"),
 
