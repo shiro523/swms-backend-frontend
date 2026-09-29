@@ -7,6 +7,10 @@ export function householdScopeWhere(user: AuthContext) {
     case "admin":
       return {};
     case "purok-leader":
+      // Archived purok: no operational data, until restored (Batch D).
+      // Residents are unaffected — their own household stays fully
+      // accessible regardless of their purok's archive state.
+      if (user.purokArchived) return { id: "__none__" };
       return { purokId: user.purokId ?? "__none__" };
     case "resident":
       return { id: user.householdId ?? "__none__" };
@@ -24,6 +28,7 @@ export function householdRelationScopeWhere(user: AuthContext) {
     case "admin":
       return {};
     case "purok-leader":
+      if (user.purokArchived) return { householdId: "__none__" };
       return { household: { purokId: user.purokId ?? "__none__" } };
     case "resident":
       return { householdId: user.householdId ?? "__none__" };
@@ -50,6 +55,11 @@ export function canAccessHousehold(
     case "admin":
       return true;
     case "purok-leader":
+      // Blocked while archived, even for a household genuinely in their own
+      // purok — matches householdScopeWhere/householdRelationScopeWhere so a
+      // leader can't bypass the archived-purok list restriction by acting on
+      // a specific household ID directly.
+      if (user.purokArchived) return false;
       return household.purokId === user.purokId;
     case "resident":
       return household.id === user.householdId;

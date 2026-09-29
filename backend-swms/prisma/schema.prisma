@@ -20,6 +20,9 @@ model Purok {
   households     Household[]
   users          User[]
   notifications  Notification[]
+  // Null = active. Set = archived (recoverable for 30 days from this
+  // timestamp; see purok.service.ts for the restore/permanent-delete rules).
+  archivedAt     DateTime?      @map("archived_at")
 
   @@map("puroks")
 }

@@ -17,7 +17,11 @@ const DEFAULT_TITLE: Record<string, string> = {
 // purok-leader has it directly on their account, a resident only has it via
 // their household.
 async function scopePurokId(user: AuthContext): Promise<string | null> {
-  if (user.role === "purok-leader") return user.purokId;
+  // Archived purok: the leader's operational scope is empty until restored
+  // (Batch D) — matches scope.ts's household/trash-log/payment scoping.
+  // Residents are deliberately unaffected here (see the branch below) —
+  // their own household's notifications keep working regardless.
+  if (user.role === "purok-leader") return user.purokArchived ? null : user.purokId;
   if (user.role === "resident" && user.householdId) {
     const household = await householdRepository.findRawById(user.householdId);
     return household?.purokId ?? null;

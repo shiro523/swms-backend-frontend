@@ -39,7 +39,10 @@ export async function authRequired(req: Request, res: Response, next: NextFuncti
   if (!user || user.tokenVersion !== payload.tokenVersion) {
     return res.status(401).json({ error: "Session has been invalidated. Please log in again." });
   }
-  req.user = payload;
+  // Fresh on every request — never trust the JWT's own (potentially
+  // long-stale) purokId/archive state. A purok can be archived at any time
+  // after a leader's token was already issued (see Batch D).
+  req.user = { ...payload, purokArchived: user.purok?.archivedAt != null };
   return next();
 }
 

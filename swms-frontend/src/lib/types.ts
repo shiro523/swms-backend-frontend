@@ -23,6 +23,9 @@ export interface Purok {
   leader: string;
   households: number;
   complianceRate: number;
+  // ISO timestamp, or null if active. Display/countdown only — the real
+  // restore/delete eligibility is always re-checked server-side.
+  archivedAt: string | null;
 }
 
 export interface FamilyMember {

@@ -3,7 +3,8 @@ import { purokService } from "@/services/purok.service";
 
 export const purokController = {
   async list(req: Request, res: Response) {
-    const rows = await purokService.list(req.user!);
+    const includeArchived = req.query.archived === "true";
+    const rows = await purokService.list(req.user!, includeArchived);
     res.json(rows);
   },
 
@@ -20,5 +21,20 @@ export const purokController = {
   async update(req: Request, res: Response) {
     const purok = await purokService.update(String(req.params.id), req.body);
     res.json(purok);
+  },
+
+  async archive(req: Request, res: Response) {
+    const purok = await purokService.archive(String(req.params.id));
+    res.json(purok);
+  },
+
+  async restore(req: Request, res: Response) {
+    const purok = await purokService.restore(String(req.params.id));
+    res.json(purok);
+  },
+
+  async permanentlyDelete(req: Request, res: Response) {
+    await purokService.permanentlyDelete(String(req.params.id));
+    res.status(204).send();
   },
 };

@@ -14,3 +14,10 @@ export async function getDbTodayAndTime(): Promise<{ today: Date; time: string }
   `;
   return rows[0];
 }
+
+// Full timestamp (not just the calendar date) — used where sub-day precision
+// matters, e.g. Purok archive/restore-window arithmetic (Batch D).
+export async function getDbNow(): Promise<Date> {
+  const rows = await prisma.$queryRaw<{ now: Date }[]>`SELECT NOW() AS now`;
+  return rows[0].now;
+}

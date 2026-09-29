@@ -16,6 +16,19 @@ router.post("/", requireRole("admin"), validateBody(createPurokSchema), purokCon
 // PATCH /api/puroks/:id — edit a purok's name/leader name/leader account (admin only)
 router.patch("/:id", requireRole("admin"), validateBody(updatePurokSchema), purokController.update);
 
+// POST /api/puroks/:id/archive — archive a purok (admin only). Recoverable
+// for 30 days; never touches households/users/notifications.
+router.post("/:id/archive", requireRole("admin"), purokController.archive);
+
+// POST /api/puroks/:id/restore — restore an archived purok within the
+// 30-day window (admin only).
+router.post("/:id/restore", requireRole("admin"), purokController.restore);
+
+// DELETE /api/puroks/:id — permanently delete a purok (admin only). Only
+// succeeds if archived for 30+ days AND has zero households/users/
+// notifications referencing it — never cascades.
+router.delete("/:id", requireRole("admin"), purokController.permanentlyDelete);
+
 // GET /api/puroks/:id/accounts — the leader + resident accounts under this purok (admin only)
 router.get("/:id/accounts", requireRole("admin"), purokController.getAccounts);
 

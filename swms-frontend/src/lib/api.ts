@@ -177,6 +177,10 @@ export const api = {
       body: JSON.stringify(input),
     }),
   purokAccounts: (id: string) => request<PurokAccounts>(`/puroks/${id}/accounts`),
+  archivedPuroks: () => request<Purok[]>("/puroks?archived=true"),
+  archivePurok: (id: string) => request<Purok>(`/puroks/${id}/archive`, { method: "POST" }),
+  restorePurok: (id: string) => request<Purok>(`/puroks/${id}/restore`, { method: "POST" }),
+  deletePurokPermanently: (id: string) => request<void>(`/puroks/${id}`, { method: "DELETE" }),
 
   createPayment: (input: {
     householdId: string;

@@ -15,6 +15,10 @@ export function mapPurok(p: any) {
     leader: p.leaderName,
     households: Number(p._count?.households ?? 0),
     complianceRate: Number(p.complianceRate),
+    // ISO string (or null if active) — the frontend uses this only for
+    // display/countdown purposes; the actual 30-day restore/delete gates are
+    // always re-checked server-side, never trusted from this value alone.
+    archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
   };
 }
 

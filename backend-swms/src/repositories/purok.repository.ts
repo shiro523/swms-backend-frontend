@@ -44,4 +44,41 @@ export const purokRepository = {
   update(id: string, data: { name?: string; leaderName?: string }) {
     return prisma.purok.update({ where: { id }, data });
   },
+
+  archive(id: string, at: Date) {
+    return prisma.purok.update({
+      where: { id },
+      data: { archivedAt: at },
+      include: { _count: { select: { households: true } } },
+    });
+  },
+
+  restore(id: string) {
+    return prisma.purok.update({
+      where: { id },
+      data: { archivedAt: null },
+      include: { _count: { select: { households: true } } },
+    });
+  },
+
+  // Every direct dependency that must be zero before a permanently-archived
+  // purok can be hard-deleted — see schema.prisma: Household (cascade),
+  // User (set null), Notification (cascade) are the only three direct
+  // relations into Purok. Never delete through this without checking these.
+  async countDependents(id: string) {
+    const [households, users, notifications] = await Promise.all([
+      prisma.household.count({ where: { purokId: id } }),
+      prisma.user.count({ where: { purokId: id } }),
+      prisma.notification.count({ where: { targetPurokId: id } }),
+    ]);
+    return { households, users, notifications };
+  },
+
+  // Only ever called after purokService's full safety-check chain passes —
+  // this method itself performs no checks, matching this codebase's existing
+  // repository/service split (repositories are mechanical, services hold
+  // the business rules).
+  delete(id: string) {
+    return prisma.purok.delete({ where: { id } });
+  },
 };
