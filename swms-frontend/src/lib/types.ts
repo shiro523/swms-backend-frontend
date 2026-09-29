@@ -65,6 +65,8 @@ export interface TrashLog {
   notes?: string;
 }
 
+export type ViolationStatus = "active" | "completed";
+
 export interface Violation {
   id: string;
   householdId: string;
@@ -75,6 +77,9 @@ export interface Violation {
   date: string;
   isRepeat: boolean;
   notes: string;
+  status: ViolationStatus;
+  resolvedAt: string | null;
+  resolvedByName: string | null;
 }
 
 export interface Payment {

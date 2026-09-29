@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
+import { ViolationStatusBadge } from "@/components/violations/ViolationStatusBadge";
+import { CompleteViolationButton } from "@/components/violations/CompleteViolationButton";
+import { formatResolvedDate } from "@/lib/violation";
 import type { XlsxColumn } from "@/lib/exportXlsx";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
@@ -19,19 +23,14 @@ const xlsxColumns: XlsxColumn<Violation>[] = [
   { header: "Date", accessor: (v) => v.date },
   { header: "Repeat Offense", accessor: (v) => (v.isRepeat ? "Yes" : "No") },
   { header: "Notes", accessor: (v) => v.notes ?? "" },
+  { header: "Status", accessor: (v) => (v.status === "completed" ? "Completed" : "Active") },
+  { header: "Completed Date", accessor: (v) => (v.status === "completed" ? formatResolvedDate(v.resolvedAt) : "") },
 ];
 
-const columns: Column<Violation>[] = [
-  { header: "Household", accessor: (v) => (
-      <span className="font-medium text-ink">{v.representative} <span className="stamp text-[10px] text-ink/40">{v.householdCode}</span></span>
-    ) },
-  { header: "Type", accessor: (v) => v.type },
-  { header: "Date", accessor: (v) => v.date },
-  { header: "Repeat offense", accessor: (v) => (v.isRepeat ? <StatusBadge status="violation" /> : "—") },
-  { header: "Notes", accessor: (v) => <span className="text-ink/50">{v.notes}</span> },
-];
+type Filter = "all" | "active" | "completed";
 
 export default function PurokLeaderViolationsPage() {
+  const [filter, setFilter] = useState<Filter>("active");
   const query = useApi(
     () =>
       Promise.all([api.puroks(), api.violations()]).then(([puroks, violations]) => ({
@@ -42,6 +41,40 @@ export default function PurokLeaderViolationsPage() {
   );
 
   const violations = query.data?.violations ?? [];
+  const filtered = filter === "all" ? violations : violations.filter((v) => v.status === filter);
+
+  const columns: Column<Violation>[] = [
+    { header: "Household", accessor: (v) => (
+        <span className="font-medium text-ink">{v.representative} <span className="stamp text-[10px] text-ink/40">{v.householdCode}</span></span>
+      ) },
+    { header: "Type", accessor: (v) => v.type },
+    { header: "Date", accessor: (v) => v.date },
+    { header: "Repeat offense", accessor: (v) => (v.isRepeat ? <StatusBadge status="violation" /> : "—") },
+    { header: "Notes", accessor: (v) => <span className="text-ink/50">{v.notes}</span> },
+    {
+      header: "Status",
+      accessor: (v) =>
+        v.status === "completed" ? (
+          <div>
+            <ViolationStatusBadge status="completed" />
+            <p className="mt-1 text-[10.5px] text-ink/45">
+              {formatResolvedDate(v.resolvedAt)} · {v.resolvedByName ?? "—"}
+            </p>
+          </div>
+        ) : (
+          <ViolationStatusBadge status="active" />
+        ),
+    },
+    {
+      header: "Action",
+      accessor: (v) =>
+        v.status === "active" ? (
+          <CompleteViolationButton violation={v} onCompleted={() => query.reload()} />
+        ) : (
+          <span className="text-ink/30">—</span>
+        ),
+    },
+  ];
 
   return (
     <div>
@@ -55,10 +88,31 @@ export default function PurokLeaderViolationsPage() {
           )
         }
       />
+
+      <div className="mb-4 flex gap-2">
+        {(
+          [
+            { key: "active" as const, label: "Active" },
+            { key: "completed" as const, label: "Completed" },
+            { key: "all" as const, label: "All" },
+          ]
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
+            className={`stamp rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+              filter === tab.key ? "border-pine bg-pine-tint text-pine-dark" : "border-line bg-paper text-ink/50 hover:text-ink"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <AsyncSection query={query}>
-        {({ violations }) => (
+        {() => (
           <DataTable
-            data={violations}
+            data={filtered}
             columns={columns}
             searchPlaceholder="Search by household, code, or type…"
             searchKeys={(v) => `${v.representative} ${v.householdCode} ${v.type}`}

@@ -86,6 +86,16 @@ model Violation {
   vDate       DateTime  @map("v_date") @db.Date
   isRepeat    Boolean   @default(false) @map("is_repeat")
   notes       String    @default("")
+  // Lifecycle (Batch H): "active" | "completed". Plain string, matching this
+  // schema's existing status-field convention (TrashLog.status, Payment.status)
+  // rather than a Prisma enum. Completed violations are never deleted — they
+  // remain permanent history, and still count toward isRepeat detection.
+  status         String    @default("active")
+  resolvedAt     DateTime? @map("resolved_at")
+  // Name snapshot of the staff member who completed it, taken at completion
+  // time — mirrors TrashLog.collector's exact pattern rather than a foreign
+  // key to User (no other relation in this schema points at User).
+  resolvedByName String?   @map("resolved_by_name")
 
   @@index([householdId])
   @@map("violations")

@@ -76,6 +76,9 @@ export function mapViolation(v: any) {
     date: formatDate(v.vDate),
     isRepeat: v.isRepeat,
     notes: v.notes,
+    status: v.status,
+    resolvedAt: v.resolvedAt ? v.resolvedAt.toISOString() : null,
+    resolvedByName: v.resolvedByName ?? null,
   };
 }
 

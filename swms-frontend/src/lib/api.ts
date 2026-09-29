@@ -109,6 +109,7 @@ export const api = {
   payments: (householdId?: string) => request<Payment[]>(`/payments${qs(householdId)}`),
   currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
+  completeViolation: (id: string) => request<Violation>(`/violations/${id}/complete`, { method: "PATCH" }),
   notifications: () => request<NotificationItem[]>("/notifications"),
   markNotificationRead: (id: string) =>
     request<NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }),

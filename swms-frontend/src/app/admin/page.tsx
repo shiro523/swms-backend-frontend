@@ -89,7 +89,13 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="Total households" value={String(households.length)} sub={`${puroks.length} puroks`} icon={Home} tone="pine" />
                 <StatCard label="Paid this period" value={String(paid)} sub={`${unpaid} unpaid`} icon={Wallet} tone="azure" />
-                <StatCard label="Open violations" value={String(violations.length)} sub="Last 28 days" icon={AlertTriangle} tone="clay" />
+                <StatCard
+                  label="Open violations"
+                  value={String(violations.filter((v) => v.status === "active").length)}
+                  sub="Currently active"
+                  icon={AlertTriangle}
+                  tone="clay"
+                />
                 <StatCard
                   label="Avg. compliance"
                   value={avgCompliance !== null ? `${avgCompliance}%` : "—"}
