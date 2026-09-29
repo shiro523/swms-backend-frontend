@@ -6,6 +6,7 @@ import type {
   Purok,
   Role,
   SessionUser,
+  SystemSettings,
   TrashLog,
   Violation,
 } from "./types";
@@ -112,6 +113,21 @@ export const api = {
   markNotificationRead: (id: string) =>
     request<NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }),
   unreadNotificationCount: () => request<{ count: number }>("/notifications/unread-count"),
+
+  // --- admin-only system settings ---
+  settings: () => request<SystemSettings>("/settings"),
+  updateSettings: (input: {
+    barangayName: string;
+    municipality: string;
+    contactNumber: string;
+    monthlyCollectionFee: number;
+    collectionDays: string;
+    collectionTime: string;
+  }) =>
+    request<SystemSettings>("/settings", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
   monthlyCollectionStats: () => request<MonthlyCollectionStat[]>("/stats/monthly-collection"),
   paymentCollectionStats: () => request<PaymentCollectionStat[]>("/stats/payment-collection"),
 

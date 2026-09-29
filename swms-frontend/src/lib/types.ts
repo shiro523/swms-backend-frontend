@@ -99,3 +99,13 @@ export interface NotificationItem {
   read: boolean;
   targetPurokName: string | null;
 }
+
+export interface SystemSettings {
+  barangayName: string;
+  municipality: string;
+  contactNumber: string;
+  monthlyCollectionFee: number;
+  collectionDays: string;
+  collectionTime: string;
+  updatedAt: string;
+}

@@ -1,4 +1,5 @@
 import { statsRepository } from "@/repositories/stats.repository";
+import { settingsRepository } from "@/repositories/settings.repository";
 import { householdRelationScopeWhere } from "@/utils/scope";
 import { getDbToday } from "@/lib/dbTime";
 import type { AuthContext } from "@/lib/token";
@@ -41,24 +42,37 @@ export const statsService = {
     return months.map((m) => ({ month: m.label, ...buckets.get(m.key)! }));
   },
 
-  // Amount actually collected per month, same scoping as above. There is no
-  // backend-enforced collection-fee/target anywhere in the system (the admin
-  // settings "monthly fee" field is a disconnected placeholder, and
-  // RecordPaymentDialog lets an admin enter any amount) — so `target` is
-  // reported as null rather than a fabricated number.
+  // Amount actually collected per month, same scoping as above. `target` is
+  // the standard configured fee times the number of distinct households that
+  // actually paid that month — i.e. "did paying households pay the
+  // configured rate," not "did every household in scope pay" (that separate,
+  // already-answered question is what current-period paid/unpaid tracking on
+  // the Payments pages is for — see paymentPeriod.ts on the frontend). Before
+  // Batch F, Admin Settings' fee was a disconnected placeholder with no real
+  // value to multiply by, so `target` was reported as null rather than a
+  // fabricated number; now that the fee is real, this is that same
+  // pre-identified integration point, using the real configured value.
   async paymentCollection(user: AuthContext) {
     const today = await getDbToday();
     const months = monthWindow(today);
     const rows = await statsRepository.paidPaymentsSince(householdRelationScopeWhere(user), months[0].start);
+    const settings = await settingsRepository.get();
+    const fee = Number(settings.monthlyCollectionFee);
 
     const collected = new Map(months.map((m) => [m.key, 0]));
+    const payingHouseholds = new Map(months.map((m) => [m.key, new Set<string>()]));
     for (const row of rows) {
       if (!row.datePaid) continue;
       const key = monthKey(row.datePaid);
       if (!collected.has(key)) continue;
       collected.set(key, collected.get(key)! + Number(row.amount));
+      payingHouseholds.get(key)!.add(row.householdId);
     }
 
-    return months.map((m) => ({ month: m.label, collected: collected.get(m.key)!, target: null as number | null }));
+    return months.map((m) => ({
+      month: m.label,
+      collected: collected.get(m.key)!,
+      target: fee > 0 ? payingHouseholds.get(m.key)!.size * fee : null,
+    }));
   },
 };

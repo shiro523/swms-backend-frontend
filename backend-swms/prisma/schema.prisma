@@ -167,6 +167,22 @@ model PaymentCollectionStat {
   @@map("payment_collection_stats")
 }
 
+// Singleton system-wide configuration (Batch F) — always exactly one row,
+// id fixed at 1. Neutral defaults (empty strings, zero fee) rather than
+// fabricated production data; the admin fills these in themselves.
+model SystemSettings {
+  id                   Int      @id @default(1)
+  barangayName         String   @default("") @map("barangay_name")
+  municipality         String   @default("")
+  contactNumber        String   @default("") @map("contact_number")
+  monthlyCollectionFee Decimal  @default(0) @db.Decimal(10, 2) @map("monthly_collection_fee")
+  collectionDays       String   @default("") @map("collection_days")
+  collectionTime       String   @default("") @map("collection_time")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
 model User {
   id                  Int        @id @default(autoincrement())
   username            String     @unique

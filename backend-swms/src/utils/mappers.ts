@@ -134,3 +134,15 @@ export function mapAccount(u: any) {
     householdCode: u.household?.code ?? null,
   };
 }
+
+export function mapSettings(s: any) {
+  return {
+    barangayName: s.barangayName,
+    municipality: s.municipality,
+    contactNumber: s.contactNumber,
+    monthlyCollectionFee: Number(s.monthlyCollectionFee),
+    collectionDays: s.collectionDays,
+    collectionTime: s.collectionTime,
+    updatedAt: s.updatedAt.toISOString(),
+  };
+}

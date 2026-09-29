@@ -7,6 +7,7 @@ import paymentRoutes from "@/routes/payment.routes";
 import violationRoutes from "@/routes/violation.routes";
 import notificationRoutes from "@/routes/notification.routes";
 import statsRoutes from "@/routes/stats.routes";
+import settingsRoutes from "@/routes/settings.routes";
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use("/payments", paymentRoutes);
 router.use("/violations", violationRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/stats", statsRoutes);
+router.use("/settings", settingsRoutes);
 
 export default router;

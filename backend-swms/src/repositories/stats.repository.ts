@@ -10,11 +10,14 @@ export const statsRepository = {
     });
   },
 
-  // Only "paid" rows count as collected revenue.
+  // Only "paid" rows count as collected revenue. householdId is included so
+  // the service can compute how many distinct households paid each month
+  // (Batch F: the real configured fee needs a household count to multiply
+  // against for that month's target).
   paidPaymentsSince(where: Record<string, unknown>, since: Date) {
     return prisma.payment.findMany({
       where: { ...where, status: "paid", datePaid: { gte: since } },
-      select: { datePaid: true, amount: true },
+      select: { datePaid: true, amount: true, householdId: true },
     });
   },
 };
