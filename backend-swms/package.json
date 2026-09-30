@@ -13,10 +13,12 @@
     "start": "node ./dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:demo": "tsx prisma/seedDemo.ts",
     "db:wipe": "tsx prisma/wipe.ts",
-    "db:reset": "npm run db:migrate && npm run db:seed"
+    "db:reset": "npm run db:migrate && npm run db:seed",
+    "test": "cross-env NODE_ENV=test DOTENV_CONFIG_PATH=.env.test vitest run"
   },
   "keywords": [],
   "author": "",
@@ -47,10 +49,14 @@
     "@types/node": "^26.2.0",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.21.0",
+    "@types/supertest": "^7.2.1",
+    "cross-env": "^10.1.0",
     "prisma": "^7.9.1",
+    "supertest": "^7.3.0",
     "tsc-alias": "^1.9.1",
     "tsx": "^4.23.11",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   },
   "allowScripts": {
     "@prisma/engines@7.10.0": true,

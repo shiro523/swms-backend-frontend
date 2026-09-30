@@ -44,6 +44,16 @@ model Household {
   payments       Payment[]
   users          User[]
   notifications  Notification[]
+  // Null = active. Set = removed (resident/household permanently left the
+  // barangay) — mirrors Purok.archivedAt's exact pattern. Never
+  // hard-deletes: all historical trash logs, violations, payments, and
+  // family members remain fully intact, exactly as they were.
+  removedAt      DateTime?      @map("removed_at")
+  removalReason  String?        @map("removal_reason")
+  // Name snapshot of who performed the removal, taken at removal time —
+  // mirrors Violation.resolvedByName's exact pattern rather than a foreign
+  // key to User.
+  removedByName  String?        @map("removed_by_name")
 
   @@index([purokId])
   @@map("households")
@@ -109,14 +119,8 @@ model Payment {
   amount      Decimal   @db.Decimal(10, 2)
   status      String
   datePaid    DateTime? @map("date_paid") @db.Date
-  orNumber    String?   @map("or_number")
 
   @@unique([householdId, period])
-  // DB-level backstop for the pre-existing application check in
-  // payment.service.ts (Batch I) — Postgres allows multiple NULLs under a
-  // unique constraint, so households paying without recording an OR number
-  // are unaffected; only two non-null rows sharing the same number collide.
-  @@unique([orNumber])
   @@index([householdId])
   @@map("payments")
 }

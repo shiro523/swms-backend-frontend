@@ -11,7 +11,6 @@ interface CreatePaymentInput {
   householdId: string;
   period: string;
   amount: number;
-  orNumber?: string;
   datePaid?: string;
 }
 
@@ -28,14 +27,6 @@ const MONTH_NAMES = [
 // current period should derive it from this, not invent its own definition.
 function currentPeriodLabel(today: Date): string {
   return `${MONTH_NAMES[today.getUTCMonth()]} ${today.getUTCFullYear()}`;
-}
-
-// OR numbers are recorded from a physical receipt, so trim stray whitespace
-// and normalize case up front — otherwise "OR-1001" and "or-1001" would be
-// treated as different numbers by both the duplicate check and storage.
-function normalizeOrNumber(value?: string | null): string | null {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed.toUpperCase() : null;
 }
 
 export const paymentService = {
@@ -59,11 +50,6 @@ export const paymentService = {
       throw new HttpError(404, "Household not found");
     }
 
-    const orNumber = normalizeOrNumber(input.orNumber);
-    if (orNumber && (await paymentRepository.findByOrNumber(orNumber))) {
-      throw new HttpError(400, "That OR number is already recorded on another payment.");
-    }
-
     const datePaid = input.datePaid ? new Date(input.datePaid) : await getDbToday();
     const id = `pay-${randomUUID()}`;
     try {
@@ -75,7 +61,6 @@ export const paymentService = {
           amount: input.amount,
           status: "paid",
           datePaid,
-          orNumber,
         },
         { message: `Payment of ₱${input.amount.toFixed(2)} recorded for ${input.period}.`, nDate: datePaid },
       );
@@ -85,14 +70,6 @@ export const paymentService = {
       // constraint exists, with no further code changes.
       if (isUniqueConflict(err, "payments_household_id_period_key")) {
         throw new HttpError(409, "This household already has a payment record for this period.");
-      }
-      // Backstops the pre-check above (Batch I): two requests with the same
-      // OR number can both pass findByOrNumber() before either commits — the
-      // DB constraint is what actually prevents the second insert, and this
-      // translates that race into the exact same response the pre-check
-      // already gives a non-racing duplicate, instead of a generic 500.
-      if (isUniqueConflict(err, "payments_or_number_key")) {
-        throw new HttpError(400, "That OR number is already recorded on another payment.");
       }
       throw err;
     }

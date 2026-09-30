@@ -49,6 +49,9 @@ export const trashLogService = {
     if (!canAccessHousehold(user, household)) {
       throw new HttpError(404, "Household not found in your scope.");
     }
+    if (household!.removedAt) {
+      throw new HttpError(400, "This household has been removed and can no longer be logged.");
+    }
 
     const { today, time } = await getDbTodayAndTime();
 

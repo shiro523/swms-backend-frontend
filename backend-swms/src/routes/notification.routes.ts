@@ -20,4 +20,8 @@ router.post("/", requireRole("admin"), validateBody(createNotificationSchema), n
 // PATCH /api/notifications/:id/read — mark read for the current user only (only if visible to the caller)
 router.patch("/:id/read", notificationController.markRead);
 
+// DELETE /api/notifications/:id — permanently retract a notification for
+// everyone (admin only). Cascades its NotificationRead rows automatically.
+router.delete("/:id", requireRole("admin"), notificationController.remove);
+
 export default router;

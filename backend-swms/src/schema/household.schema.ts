@@ -28,6 +28,10 @@ export const updateHouseholdSchema = z
   })
   .refine((data) => Object.keys(data).length > 0, { message: "Nothing to update." });
 
+export const removeHouseholdSchema = z.object({
+  reason: z.string().trim().min(1, "A removal reason is required.").max(300),
+});
+
 export const addFamilyMemberSchema = z.object({
   name: z.string().trim().min(1, "Name and a valid age are required.").max(120),
   relation: z.string().trim().max(60).optional(),
@@ -37,3 +41,16 @@ export const addFamilyMemberSchema = z.object({
     .min(0, "Age must be between 0 and 120.")
     .max(120, "Age must be between 0 and 120."),
 });
+
+export const updateFamilyMemberSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    relation: z.string().trim().max(60).optional(),
+    age: z.coerce
+      .number()
+      .int()
+      .min(0, "Age must be between 0 and 120.")
+      .max(120, "Age must be between 0 and 120.")
+      .optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: "Nothing to update." });

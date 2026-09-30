@@ -39,6 +39,12 @@ export async function authRequired(req: Request, res: Response, next: NextFuncti
   if (!user || user.tokenVersion !== payload.tokenVersion) {
     return res.status(401).json({ error: "Session has been invalidated. Please log in again." });
   }
+  // Fresh on every request — a household can be removed at any time after a
+  // resident's token was already issued, same reasoning as the purokArchived
+  // check right below.
+  if (user.role === "resident" && user.household?.removedAt != null) {
+    return res.status(401).json({ error: "This household has been removed. Please contact the barangay office." });
+  }
   // Fresh on every request — never trust the JWT's own (potentially
   // long-stale) purokId/archive state. A purok can be archived at any time
   // after a leader's token was already issued (see Batch D).

@@ -19,13 +19,11 @@ export function RecordPaymentDialog({
 
   const [period, setPeriod] = useState("");
   const [amount, setAmount] = useState("");
-  const [orNumber, setOrNumber] = useState("");
   const [datePaid, setDatePaid] = useState("");
 
   const openDialog = () => {
     setPeriod("");
     setAmount("");
-    setOrNumber("");
     setDatePaid("");
     setError(null);
     setOpen(true);
@@ -45,7 +43,6 @@ export function RecordPaymentDialog({
         householdId,
         period: period.trim(),
         amount: Number(amount),
-        orNumber: orNumber.trim() || undefined,
         datePaid: datePaid || undefined,
       });
       onRecorded(payment);
@@ -83,22 +80,17 @@ export function RecordPaymentDialog({
               required
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Amount (₱)">
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                className={inputClass}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="OR number (optional)">
-              <input className={inputClass} value={orNumber} onChange={(e) => setOrNumber(e.target.value)} />
-            </Field>
-          </div>
+          <Field label="Amount (₱)">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              className={inputClass}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </Field>
           <Field label="Date paid (optional — defaults to today)">
             <input type="date" className={inputClass} value={datePaid} onChange={(e) => setDatePaid(e.target.value)} />
           </Field>

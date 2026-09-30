@@ -90,15 +90,29 @@ export const notificationService = {
     return rows.map(mapNotification);
   },
 
-  // Admin-only manual broadcast. Stays barangay-wide or purok-wide, as
-  // before — household-specific targeting is only ever produced by the
-  // automatic violation/payment triggers, not exposed here (Batch E).
+  // Admin-only manual broadcast: barangay-wide, purok-wide, or now a
+  // specific household (targeting a household this way reaches exactly the
+  // same recipients the existing visibility rules already grant a
+  // household-specific notification — that resident only, never the purok
+  // leader — unchanged from how the automatic violation/payment triggers
+  // already behave; this only adds a way for admin to create one manually).
+  // createNotificationSchema already refuses a request naming both a purok
+  // and a household, so at most one of these is ever set here.
   async create(
-    input: { type: "collection" | "payment" | "violation"; message: string; title?: string; targetPurokId?: string },
+    input: {
+      type: "collection" | "payment" | "violation";
+      message: string;
+      title?: string;
+      targetPurokId?: string;
+      targetHouseholdId?: string;
+    },
     viewerId: number,
   ) {
     if (input.targetPurokId && !(await purokRepository.findById(input.targetPurokId))) {
       throw new HttpError(400, "That purok does not exist.");
+    }
+    if (input.targetHouseholdId && !(await householdRepository.findRawById(input.targetHouseholdId))) {
+      throw new HttpError(400, "That household does not exist.");
     }
     const title = input.title?.trim() || DEFAULT_TITLE[input.type];
     const today = await getDbToday();
@@ -111,7 +125,7 @@ export const notificationService = {
         type: input.type,
         nDate: today,
         targetPurokId: input.targetPurokId || null,
-        targetHouseholdId: null,
+        targetHouseholdId: input.targetHouseholdId || null,
       },
       viewerId,
     );
@@ -140,5 +154,17 @@ export const notificationService = {
     const where = await notificationVisibilityWhere(user);
     const count = await notificationRepository.countUnread(where ?? {}, Number(user.id));
     return { count };
+  },
+
+  // Admin-only hard delete (route-gated) — retracts the notification for
+  // every role/viewer, not just the caller. NotificationRead rows for it
+  // are removed automatically via the schema's onDelete: Cascade, so no
+  // separate cleanup step is needed here.
+  async remove(id: string) {
+    const notification = await notificationRepository.findById(id);
+    if (!notification) {
+      throw new HttpError(404, "Notification not found.");
+    }
+    await notificationRepository.delete(id);
   },
 };

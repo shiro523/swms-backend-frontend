@@ -19,4 +19,9 @@ export const notificationController = {
   async unreadCount(req: Request, res: Response) {
     res.json(await notificationService.unreadCount(req.user!));
   },
+
+  async remove(req: Request, res: Response) {
+    await notificationService.remove(String(req.params.id));
+    res.status(204).send();
+  },
 };

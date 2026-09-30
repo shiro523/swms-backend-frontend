@@ -68,7 +68,10 @@ export default function PurokDetailPage() {
         {({ purok, accounts }) => {
           const archivedDays = purok?.archivedAt ? daysSince(purok.archivedAt) : null;
           const canRestore = archivedDays !== null && archivedDays <= RESTORE_WINDOW_DAYS;
-          const canPermanentlyDelete = archivedDays !== null && archivedDays > RESTORE_WINDOW_DAYS && (purok?.households ?? 0) === 0;
+          // Not time-gated — the 30-day window only governs how long restore
+          // stays available (canRestore above). Deletion only ever depends
+          // on zero dependent households, matching purok.service.ts.
+          const canPermanentlyDelete = archivedDays !== null && (purok?.households ?? 0) === 0;
 
           return (
             <>
@@ -110,9 +113,7 @@ export default function PurokDetailPage() {
                             disabled={!canPermanentlyDelete}
                             title={
                               !canPermanentlyDelete
-                                ? archivedDays !== null && archivedDays <= RESTORE_WINDOW_DAYS
-                                  ? `Still within the ${RESTORE_WINDOW_DAYS}-day restore window.`
-                                  : "This purok still has households and cannot be permanently deleted."
+                                ? "This purok still has households and cannot be permanently deleted."
                                 : undefined
                             }
                             className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-clay disabled:cursor-not-allowed disabled:opacity-40"
@@ -209,7 +210,7 @@ export default function PurokDetailPage() {
                     ? "Its households, residents, and history stay intact. You can restore it within 30 days."
                     : confirmAction === "restore"
                       ? "The purok leader's access will be restored immediately."
-                      : "This cannot be undone. Only allowed because no households currently reference this purok."
+                      : "This cannot be undone. The purok leader's login account will also be permanently removed. Only allowed because no households currently reference this purok."
                 }
               >
                 <div className="space-y-3">

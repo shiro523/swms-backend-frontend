@@ -49,6 +49,17 @@ export interface Household {
   complianceRate: number;
   username: string | null;
   email: string | null;
+  // The resident login account's own creation date, or null if the
+  // household has no resident account (shouldn't normally happen, but
+  // mirrors username/email's own null-safety above).
+  accountCreatedAt: string | null;
+  // Soft-removal (e.g. resident permanently left the barangay). Non-null
+  // means the household is inactive: hidden from active lists, blocked from
+  // new TrashLogs, and the resident account can no longer log in. All
+  // historical records stay intact and visible to Admin regardless.
+  removedAt: string | null;
+  removalReason: string | null;
+  removedByName: string | null;
 }
 
 export interface TrashLog {
@@ -92,7 +103,6 @@ export interface Payment {
   amount: number;
   status: PaymentStatus;
   datePaid?: string;
-  orNumber?: string;
 }
 
 export interface NotificationItem {
@@ -103,6 +113,7 @@ export interface NotificationItem {
   date: string;
   read: boolean;
   targetPurokName: string | null;
+  targetHouseholdCode: string | null;
 }
 
 export interface SystemSettings {

@@ -53,4 +53,12 @@ export const notificationRepository = {
   ) {
     return prisma.notification.create({ data, include: include(viewerId) });
   },
+
+  // NotificationRead.notification has onDelete: Cascade in schema.prisma —
+  // deleting a notification's row already cascades away every user's read
+  // state for it at the database level. Nothing else references
+  // Notification, so this alone fully retracts it for every viewer.
+  delete(id: string) {
+    return prisma.notification.delete({ where: { id } });
+  },
 };

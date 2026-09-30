@@ -54,11 +54,14 @@ export const trashLogRepository = {
         await tx.violation.create({ data: violationData });
 
         const today = violationData.vDate;
+        // Household/resident-facing content — states only real data already
+        // on violationData (type, date), plus a fixed compliance instruction.
+        // Never fabricates anything not already in the database.
         await tx.notification.create({
           data: {
             id: `n-${randomUUID().slice(0, 8)}`,
-            title: "Violation Notice",
-            message: `${violationData.type} recorded for your household.`,
+            title: "Waste Segregation Violation",
+            message: `Your household was recorded with a ${violationData.type} violation on ${violationData.vDate.toISOString().slice(0, 10)}. Please comply with the barangay's waste segregation rules to avoid further violations.`,
             type: "violation",
             nDate: today,
             targetHouseholdId: violationData.householdId,

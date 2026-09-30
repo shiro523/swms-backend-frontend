@@ -46,6 +46,14 @@ export function mapHousehold(h: any) {
     complianceRate: Number(h.complianceRate),
     username: h.users?.[0]?.username ?? null,
     email: h.users?.[0]?.email ?? null,
+    // The resident login account's own creation date — already fetched via
+    // HOUSEHOLD_INCLUDE's `users` relation (see household.repository.ts),
+    // just not previously surfaced. Never exposes passwordHash/resetTokenHash
+    // or any other field from that row.
+    accountCreatedAt: h.users?.[0]?.createdAt ? h.users[0].createdAt.toISOString() : null,
+    removedAt: h.removedAt ? h.removedAt.toISOString() : null,
+    removalReason: h.removalReason ?? null,
+    removedByName: h.removedByName ?? null,
   };
 }
 
@@ -93,7 +101,6 @@ export function mapPayment(p: any) {
     amount: Number(p.amount),
     status: p.status,
     datePaid: p.datePaid ? formatDate(p.datePaid) : undefined,
-    orNumber: p.orNumber ?? undefined,
   };
 }
 
@@ -108,6 +115,7 @@ export function mapNotification(n: any) {
     // repository to just the current viewer's own row, if any.
     read: (n.reads?.length ?? 0) > 0,
     targetPurokName: n.targetPurok?.name ?? null,
+    targetHouseholdCode: n.targetHousehold?.code ?? null,
   };
 }
 

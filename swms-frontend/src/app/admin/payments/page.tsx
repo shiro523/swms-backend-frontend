@@ -18,8 +18,7 @@ const columns: Column<Payment>[] = [
     ) },
   { header: "Purok", accessor: (p) => p.purokName },
   { header: "Period", accessor: (p) => p.period },
-  { header: "Amount", accessor: (p) => `₱${p.amount.toFixed(2)}` },
-  { header: "OR number", accessor: (p) => p.orNumber ?? "—" },
+  { header: "Amount", accessor: (p) => (p.status === "unpaid" ? "—" : `₱${p.amount.toFixed(2)}`) },
   { header: "Date paid", accessor: (p) => p.datePaid ?? "—" },
   { header: "Status", accessor: (p) => <StatusBadge status={p.status} /> },
 ];
@@ -52,15 +51,33 @@ export default function PaymentsPage() {
     currentPeriod,
   );
 
-  // The All/Paid/Unpaid toggle now filters payment rows by whether their
-  // household is paid/unpaid for the current period, instead of the row's
-  // own (always-"paid") status.
+  // The Unpaid tab can't show a real Payment row — by definition, an unpaid
+  // household has no payment record for the current period, so the only
+  // rows that could exist for them are historical (from an earlier period,
+  // when they WERE paid), which would misleadingly show a "Paid" status
+  // badge under an "Unpaid" heading. Synthesizing one placeholder row per
+  // unpaid household — built from data already fetched (unpaidHouseholds),
+  // never a fabricated record — makes the tab show exactly what's true
+  // ("no payment recorded for this period") without ever surfacing a stale
+  // paid record in the wrong context. All/Paid are unaffected and still
+  // show real Payment rows, including full history.
+  const unpaidRows: Payment[] = unpaidHouseholds.map((h) => ({
+    id: `unpaid-${h.id}`,
+    householdId: h.id,
+    householdCode: h.code,
+    representative: h.representative,
+    purokName: h.purokName,
+    period: currentPeriod,
+    amount: 0,
+    status: "unpaid",
+  }));
+
   const filtered =
     filter === "all"
       ? payments
       : filter === "paid"
         ? payments.filter((p) => paidHouseholdIds.has(p.householdId))
-        : payments.filter((p) => !paidHouseholdIds.has(p.householdId));
+        : unpaidRows;
 
   const collected = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
   const periodEyebrow = currentPeriod ? `${currentPeriod} collection` : "Collection";

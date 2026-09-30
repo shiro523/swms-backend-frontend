@@ -10,7 +10,24 @@ import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { Household } from "@/lib/types";
 
-const columns: Column<Household>[] = [
+const RESTORE_WINDOW_DAYS = 30;
+
+function daysSince(iso: string) {
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+// "Removed on <date>" — 30-day recovery window measured from removedAt,
+// mirroring the admin Puroks archived-list's exact daysSince/RESTORE_WINDOW
+// pattern (see admin/puroks/[id]/page.tsx).
+function recoveryStatus(removedAt: string | null) {
+  if (!removedAt) return "—";
+  const elapsed = daysSince(removedAt);
+  const remaining = RESTORE_WINDOW_DAYS - elapsed;
+  if (remaining <= 0) return "Restore window passed";
+  return `${remaining} day${remaining === 1 ? "" : "s"} left to restore`;
+}
+
+const activeColumns: Column<Household>[] = [
   {
     header: "Household",
     accessor: (h) => (
@@ -26,11 +43,32 @@ const columns: Column<Household>[] = [
   { header: "Compliance", accessor: (h) => `${h.complianceRate}%` },
 ];
 
+const removedColumns: Column<Household>[] = [
+  {
+    header: "Household",
+    accessor: (h) => (
+      <Link href={`/admin/households/${h.id}`} className="font-medium text-ink hover:text-pine-dark hover:underline">
+        {h.representative}
+        <span className="stamp ml-2 text-[10px] text-ink/40">{h.code}</span>
+      </Link>
+    ),
+  },
+  { header: "Purok", accessor: (h) => h.purokName },
+  { header: "Removed on", accessor: (h) => h.removedAt?.slice(0, 10) ?? "—" },
+  { header: "Reason", accessor: (h) => h.removalReason ?? "—" },
+  { header: "Removed by", accessor: (h) => h.removedByName ?? "—" },
+  { header: "Recovery", accessor: (h) => recoveryStatus(h.removedAt) },
+];
+
 export default function HouseholdsPage() {
+  const [view, setView] = useState<"active" | "removed">("active");
   const [purokFilter, setPurokFilter] = useState("all");
   const query = useApi(
-    () => Promise.all([api.households(), api.puroks()]).then(([households, puroks]) => ({ households, puroks })),
-    [],
+    () =>
+      Promise.all([view === "active" ? api.households() : api.removedHouseholds(), api.puroks()]).then(
+        ([households, puroks]) => ({ households, puroks }),
+      ),
+    [view],
   );
 
   const households = query.data?.households ?? [];
@@ -40,7 +78,7 @@ export default function HouseholdsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow={`${households.length} registered`}
+        eyebrow={`${households.length} ${view === "active" ? "registered" : "removed"}`}
         title="Households"
         description="Every registered household, its purok assignment, and current standing. Households are registered by each purok's leader."
         actions={
@@ -71,11 +109,29 @@ export default function HouseholdsPage() {
           </div>
         }
       />
+
+      <div className="mb-4 flex gap-2">
+        {[
+          { key: "active" as const, label: "Active" },
+          { key: "removed" as const, label: "Removed" },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setView(tab.key)}
+            className={`stamp rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+              view === tab.key ? "border-pine bg-pine-tint text-pine-dark" : "border-line bg-paper text-ink/50 hover:text-ink"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <AsyncSection query={query}>
         {() => (
           <DataTable
             data={filtered}
-            columns={columns}
+            columns={view === "active" ? activeColumns : removedColumns}
             searchPlaceholder="Search by name, code, or purok…"
             searchKeys={(h) => `${h.representative} ${h.code} ${h.purokName}`}
             pageSize={10}

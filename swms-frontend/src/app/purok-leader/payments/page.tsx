@@ -22,11 +22,6 @@ const xlsxColumns: XlsxColumn<Payment>[] = [
   { header: "Amount", accessor: (p) => p.amount, numFmt: '"₱"#,##0.00' },
   { header: "Date Paid", accessor: (p) => p.datePaid ?? "" },
   { header: "Status", accessor: (p) => p.status },
-  // Forced text via a leading apostrophe cue is unnecessary here — writing a
-  // plain string value already yields a text cell in exceljs, never a
-  // numeric one, so OR numbers keep leading zeros and never render in
-  // scientific notation.
-  { header: "OR Number", accessor: (p) => p.orNumber ?? "" },
 ];
 
 const columns: Column<Payment>[] = [

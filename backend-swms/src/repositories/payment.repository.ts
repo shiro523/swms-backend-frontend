@@ -16,10 +16,6 @@ export const paymentRepository = {
     return prisma.payment.findUnique({ where: { id }, include: PAYMENT_INCLUDE });
   },
 
-  findByOrNumber(orNumber: string) {
-    return prisma.payment.findFirst({ where: { orNumber } });
-  },
-
   // Creates the payment and its household-specific notification atomically
   // (Batch E) — no purok-leader notification, per the approved design. Both
   // inserts share the payment's own uniqueness constraint
@@ -34,7 +30,6 @@ export const paymentRepository = {
       amount: number;
       status: string;
       datePaid: Date;
-      orNumber: string | null;
     },
     notification: { message: string; nDate: Date },
   ) {

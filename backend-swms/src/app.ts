@@ -18,17 +18,18 @@ const app = express();
 // already conditioned on config.isProduction.
 app.use(helmet({ hsts: config.isProduction }));
 
-// `trust proxy` deliberately left at Express's default (false/off) rather
-// than changed here. The login/forgot-password rate limiters below key on
-// req.ip; behind a single reverse proxy (typical for most PaaS deploys),
-// Express would otherwise see the proxy's IP for every request and the
-// limiters would treat all users as one caller. But blindly trusting
-// X-Forwarded-For is itself a spoofing risk if the app is ever reachable
-// directly (not behind a trusted proxy) — a malicious client could set that
-// header to bypass rate limiting entirely. This depends on the actual
-// deployment topology, which isn't known at the time of this change: if you
-// deploy behind exactly one trusted reverse proxy, set
-// `app.set("trust proxy", 1)` to match that specific hop count.
+// Render (this app's production host) puts exactly one reverse proxy
+// between the internet and this process, so trusting one hop's
+// X-Forwarded-For is safe here and is what makes the login/forgot-password
+// rate limiters (which key on req.ip) see each real caller's IP instead of
+// Render's proxy IP for every request. Gated on production only — in local
+// dev there's no proxy in front of this process, and blindly trusting
+// X-Forwarded-For when reachable directly would let a client spoof its own
+// IP to bypass rate limiting.
+if (config.isProduction) {
+  app.set("trust proxy", 1);
+}
+
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(cookieParser());

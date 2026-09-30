@@ -20,7 +20,7 @@ export default function ResidentPaymentsPage() {
                 <div key={p.id} className="flex items-center justify-between py-3 text-sm">
                   <div>
                     <p className="font-medium text-ink">{p.period}</p>
-                    <p className="text-xs text-ink/45">{p.orNumber ? `OR ${p.orNumber}` : "No receipt yet"} {p.datePaid ? `· Paid ${p.datePaid}` : ""}</p>
+                    {p.datePaid && <p className="text-xs text-ink/45">Paid {p.datePaid}</p>}
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-[family-name:var(--font-display)] text-sm font-semibold text-ink">₱{p.amount.toFixed(2)}</span>

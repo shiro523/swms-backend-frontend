@@ -154,10 +154,21 @@ export const purokService = {
 
   // Hard delete — the only genuinely destructive operation in this feature.
   // Every check below must pass before anything is touched; if any fails,
-  // nothing is modified. Never cascades: households/trash logs/payments/
-  // violations/family members are only ever removed by removing the
-  // households themselves first (a separate, existing flow), never as a
-  // side effect of deleting their purok.
+  // nothing is modified. Never cascades households/trash logs/payments/
+  // violations/family members — those are only ever removed by removing the
+  // households themselves first (a separate, existing flow). The one
+  // exception is the purok's own leader account, which IS deleted here,
+  // atomically with the purok itself (see deleteWithLeader) — that account
+  // always exists because createWithLeader() always creates it, so treating
+  // it as a blocker would make permanent deletion unreachable for every
+  // normally-created purok. This is not a general user-delete feature: it
+  // only ever removes the one leader account this purok itself owns.
+  //
+  // Deliberately NOT time-gated on RESTORE_WINDOW_MS — that window governs
+  // only how long restore() stays available (see above). An admin may
+  // permanently delete an archived purok immediately, provided it has zero
+  // households and no other unexpected dependents; the only thing that
+  // changes after 30 days is that restore is no longer an option.
   async permanentlyDelete(purokId: string) {
     const purok = await purokRepository.findById(purokId);
     if (!purok) {
@@ -166,10 +177,6 @@ export const purokService = {
     if (!purok.archivedAt) {
       throw new HttpError(400, "Only an archived purok can be permanently deleted.");
     }
-    const now = await getDbNow();
-    if (now.getTime() - purok.archivedAt.getTime() < RESTORE_WINDOW_MS) {
-      throw new HttpError(400, "This purok has not been archived for 30 days yet.");
-    }
     const deps = await purokRepository.countDependents(purokId);
     if (deps.households > 0 || deps.users > 0 || deps.notifications > 0) {
       throw new HttpError(
@@ -177,7 +184,7 @@ export const purokService = {
         "This purok still has households, accounts, or notifications referencing it and cannot be permanently deleted.",
       );
     }
-    await purokRepository.delete(purokId);
+    await purokRepository.deleteWithLeader(purokId);
   },
 
   // Every login account tied to a purok: its leader plus every resident

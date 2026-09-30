@@ -126,7 +126,6 @@ const demoPayments = demoHouseholds.flatMap((hh, i) => {
     period,
     amount: 75,
     datePaid: `2026-${String(4 + PAYMENT_PERIODS.indexOf(period) * 2).padStart(2, "0")}-${String(10 + (i % 15)).padStart(2, "0")}`,
-    orNumber: `OR-2026-${String(5000 + i * 3 + p)}`,
   }));
 });
 
@@ -208,7 +207,6 @@ async function seedDemo() {
           amount: p.amount,
           status: "paid",
           datePaid: new Date(p.datePaid),
-          orNumber: p.orNumber, // already trimmed/uppercase, matching Batch 3 C5 normalization
         })),
         skipDuplicates: true,
       });

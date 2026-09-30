@@ -107,9 +107,7 @@ else.
 for a billing period (e.g. "September 2026"). "Paid/unpaid for the current
 period" is always derived by matching real payment records against the
 server's own current-period definition — never from a client clock or a
-static stored flag. OR numbers, where recorded, are validated for
-uniqueness both on submission and at the database level, so two payments can
-never end up sharing the same receipt number even under a race.
+static stored flag.
 
 **Purok archive/restore** — Admin can archive a purok (its leader's
 operational access is suspended, but residents and historical data are

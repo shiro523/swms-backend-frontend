@@ -5,11 +5,18 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { username } });
   },
 
-  // Includes the user's purok archived state — authRequired() reads this on
-  // every request to keep a purok-leader's operational access in sync with
-  // their purok's live archive state, never trusting the JWT's stale claim.
+  // Includes the user's purok archived state and (for a resident) household
+  // removed state — authRequired() reads both on every request to keep a
+  // purok-leader's/resident's operational access in sync with the live
+  // archive/removal state, never trusting the JWT's stale claim.
   findById(id: number) {
-    return prisma.user.findUnique({ where: { id }, include: { purok: { select: { archivedAt: true } } } });
+    return prisma.user.findUnique({
+      where: { id },
+      include: {
+        purok: { select: { archivedAt: true } },
+        household: { select: { removedAt: true } },
+      },
+    });
   },
 
   findByEmail(email: string) {
