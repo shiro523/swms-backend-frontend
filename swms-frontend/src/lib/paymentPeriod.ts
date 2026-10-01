@@ -10,13 +10,24 @@ import type { Household, Payment } from "./types";
 //
 // currentPeriod should come from api.currentPaymentPeriod() — the server's
 // one authoritative definition — never recomputed from the browser's clock.
+// Case-insensitive on purpose: the Period field on RecordPaymentDialog is
+// free text (e.g. "October 2026"), so a leader typing "october 2026" for
+// this same period must still count as paid for it — a plain === match
+// would otherwise leave that household showing as unpaid despite having
+// just paid. Never changes what's actually stored; only loosens the
+// comparison used to decide paid/unpaid.
+function normalizePeriod(period: string): string {
+  return period.trim().toLowerCase();
+}
+
 export function splitHouseholdsByCurrentPeriod(
   households: Household[],
   payments: Payment[],
   currentPeriod: string,
 ) {
+  const normalizedCurrentPeriod = normalizePeriod(currentPeriod);
   const paidHouseholdIds = new Set(
-    payments.filter((p) => p.period === currentPeriod).map((p) => p.householdId),
+    payments.filter((p) => normalizePeriod(p.period) === normalizedCurrentPeriod).map((p) => p.householdId),
   );
   return {
     paidHouseholdIds,
