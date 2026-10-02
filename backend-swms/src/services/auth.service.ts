@@ -65,7 +65,20 @@ export const authService = {
     await userRepository.setResetToken(user.id, hashToken(rawToken), expiresAt);
 
     const resetUrl = `${config.frontendOrigin}/reset-password/${rawToken}`;
-    await sendPasswordResetEmail(email, resetUrl);
+    // Never let a mail-server failure (unreachable SMTP host, timeout, auth
+    // error — all transient, all real possibilities in production) surface
+    // as a 500. This method's own contract is "always succeeds, never
+    // reveals whether the account exists" — a thrown error here would both
+    // crash on a legitimate request AND let an attacker distinguish a real
+    // email (reaches the mail step, 500s on failure) from a fake one
+    // (returns early, always 200). The reset token is already saved either
+    // way, so a resend/retry still works even if this particular email
+    // attempt failed.
+    try {
+      await sendPasswordResetEmail(email, resetUrl);
+    } catch (err) {
+      console.error("Failed to send password reset email:", err);
+    }
   },
 
   async resetPassword(token: string, newPassword: string) {

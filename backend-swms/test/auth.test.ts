@@ -155,4 +155,28 @@ describe("authentication", () => {
       .send({ username: household.residentUsername, password: newPassword });
     expect(newPasswordLogin.status).toBe(200);
   });
+
+  it("forgot-password still succeeds (never a 500) for a real email when the mail server is unreachable, same as for a non-existent one", async () => {
+    // No SMTP is configured in .env.test, so this exercises the real
+    // failure mode forgotPassword() must tolerate: sendPasswordResetEmail()
+    // actually throwing (ECONNREFUSED), not a mocked/skipped mail step.
+    // Both cases must return the exact same response — that's the whole
+    // point of this endpoint never revealing which emails are registered.
+    const household = await createTestHousehold(await createTestPurok(nextRunId()));
+    const user = await prisma.user.findUniqueOrThrow({ where: { username: household.residentUsername } });
+
+    const forReal = await request(app).post("/api/auth/forgot-password").send({ email: user.email });
+    expect(forReal.status).toBe(200);
+
+    const forFake = await request(app)
+      .post("/api/auth/forgot-password")
+      .send({ email: "definitely-not-registered@example-test.invalid" });
+    expect(forFake.status).toBe(200);
+    expect(forFake.body.message).toBe(forReal.body.message);
+
+    // The reset token was still saved despite the mail-send failure, so a
+    // later retry/resend of the email would still work against it.
+    const refreshed = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(refreshed.resetTokenHash).not.toBeNull();
+  });
 });
