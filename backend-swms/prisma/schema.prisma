@@ -120,7 +120,14 @@ model Payment {
   status      String
   datePaid    DateTime? @map("date_paid") @db.Date
 
-  @@unique([householdId, period])
+  // Deliberately NOT unique on (householdId, period): the real business
+  // rule is weekly Sunday collections, and a household may make multiple
+  // payments toward the same collection period (partial payments, or more
+  // than one installment) — see commit history for the removal of the
+  // (householdId, period) unique constraint that used to block this.
+  // Paid/unpaid status (splitHouseholdsByCurrentPeriod, frontend) only
+  // checks whether at least one matching-period payment EXISTS, so having
+  // several rows for the same period is unaffected by that logic.
   @@index([householdId])
   @@map("payments")
 }

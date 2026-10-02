@@ -4,7 +4,7 @@ import { householdRepository } from "@/repositories/household.repository";
 import { mapPayment } from "@/utils/mappers";
 import { relationScopedWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbToday } from "@/lib/dbTime";
-import { HttpError, isUniqueConflict } from "@/middlewares/error.middleware";
+import { HttpError } from "@/middlewares/error.middleware";
 import type { AuthContext } from "@/lib/token";
 
 interface CreatePaymentInput {
@@ -52,27 +52,24 @@ export const paymentService = {
 
     const datePaid = input.datePaid ? new Date(input.datePaid) : await getDbToday();
     const id = `pay-${randomUUID()}`;
-    try {
-      await paymentRepository.createWithNotification(
-        {
-          id,
-          householdId: input.householdId,
-          period: input.period,
-          amount: input.amount,
-          status: "paid",
-          datePaid,
-        },
-        { message: `Payment of ₱${input.amount.toFixed(2)} recorded for ${input.period}.`, nDate: datePaid },
-      );
-    } catch (err) {
-      // Inert until the household+period unique constraint is approved and
-      // migrated (see C4); wired up now so it takes effect the moment that
-      // constraint exists, with no further code changes.
-      if (isUniqueConflict(err, "payments_household_id_period_key")) {
-        throw new HttpError(409, "This household already has a payment record for this period.");
-      }
-      throw err;
-    }
+    // No (householdId, period) uniqueness check: the real business rule is
+    // weekly Sunday collections, and a household may legitimately make
+    // more than one payment toward the same collection period (partial
+    // payments, or several installments) — see the migration that dropped
+    // that constraint. splitHouseholdsByCurrentPeriod only checks whether
+    // at least one matching-period payment exists, so multiple rows for
+    // the same period are handled correctly without any special-casing.
+    await paymentRepository.createWithNotification(
+      {
+        id,
+        householdId: input.householdId,
+        period: input.period,
+        amount: input.amount,
+        status: "paid",
+        datePaid,
+      },
+      { message: `Payment of ₱${input.amount.toFixed(2)} recorded for ${input.period}.`, nDate: datePaid },
+    );
     await householdRepository.updatePaymentStatus(input.householdId, "paid");
 
     const row = await paymentRepository.findById(id);
@@ -90,14 +87,7 @@ export const paymentService = {
     if (!existing) {
       throw new HttpError(404, "Payment not found");
     }
-    try {
-      const row = await paymentRepository.updatePeriod(id, period);
-      return mapPayment(row);
-    } catch (err) {
-      if (isUniqueConflict(err, "payments_household_id_period_key")) {
-        throw new HttpError(409, "This household already has a payment record for that period.");
-      }
-      throw err;
-    }
+    const row = await paymentRepository.updatePeriod(id, period);
+    return mapPayment(row);
   },
 };
