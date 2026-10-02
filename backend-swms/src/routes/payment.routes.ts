@@ -2,7 +2,7 @@ import { Router } from "express";
 import { paymentController } from "@/controllers/payment.controller";
 import { authRequired, requireRole } from "@/middlewares/auth.middleware";
 import { validateBody } from "@/middlewares/validate.middleware";
-import { createPaymentSchema } from "@/schema/payment.schema";
+import { createPaymentSchema, correctPaymentPeriodSchema } from "@/schema/payment.schema";
 
 const router = Router();
 router.use(authRequired);
@@ -20,5 +20,16 @@ router.get("/current-period", paymentController.currentPeriod);
 // household in their own purok — enforced by canAccessHousehold in the
 // service, same pattern as trash-log creation).
 router.post("/", requireRole("admin", "purok-leader"), validateBody(createPaymentSchema), paymentController.create);
+
+// PATCH /api/payments/:id/period — admin-only correction of a malformed
+// stored period (e.g. "October" instead of "October 2026"). Never creates
+// a new payment and never touches amount/householdId/datePaid — only
+// requireRole("admin") may call this; Purok Leader and Resident get 403.
+router.patch(
+  "/:id/period",
+  requireRole("admin"),
+  validateBody(correctPaymentPeriodSchema),
+  paymentController.correctPeriod,
+);
 
 export default router;

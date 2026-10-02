@@ -22,6 +22,22 @@ const MONTH_NAMES = [
 ];
 const PERIOD_PATTERN = new RegExp(`^(${MONTH_NAMES.join("|")}) \\d{4}$`, "i");
 
+// Single reusable field definition — both createPaymentSchema (below) and
+// correctPaymentPeriodSchema (the admin-only period-correction endpoint)
+// validate/normalize `period` through this exact same schema, so there is
+// only ever one place that decides what a valid period looks like.
+const periodField = z
+  .string()
+  .trim()
+  .min(1, "Period is required.")
+  .max(40)
+  .regex(PERIOD_PATTERN, 'Period must be in the format "Month YYYY", e.g. "October 2026".')
+  .transform((value) => {
+    const [month, year] = value.split(" ");
+    const canonicalMonth = MONTH_NAMES.find((m) => m.toLowerCase() === month.toLowerCase())!;
+    return `${canonicalMonth} ${year}`;
+  });
+
 // The frontend sends this from an <input type="date">, which the browser
 // already constrains to real calendar dates in YYYY-MM-DD — this re-checks
 // the same thing server-side so a malformed value (e.g. a raw API call)
@@ -36,21 +52,21 @@ function isValidCalendarDate(value: string): boolean {
 
 export const createPaymentSchema = z.object({
   householdId: z.string().trim().min(1, "Household is required."),
-  period: z
-    .string()
-    .trim()
-    .min(1, "Period is required.")
-    .max(40)
-    .regex(PERIOD_PATTERN, 'Period must be in the format "Month YYYY", e.g. "October 2026".')
-    .transform((value) => {
-      const [month, year] = value.split(" ");
-      const canonicalMonth = MONTH_NAMES.find((m) => m.toLowerCase() === month.toLowerCase())!;
-      return `${canonicalMonth} ${year}`;
-    }),
+  period: periodField,
   amount: z.coerce.number().positive("Amount must be greater than zero."),
   datePaid: z
     .string()
     .trim()
     .optional()
     .refine((v) => !v || isValidCalendarDate(v), "Date paid must be a valid date in YYYY-MM-DD format."),
+});
+
+// Admin-only correction of an existing payment's period (e.g. a payment
+// recorded with period "October" instead of "October 2026", which would
+// otherwise never match the current-period paid/unpaid comparison again).
+// Deliberately the only field here — amount/householdId/datePaid/id are
+// structurally absent from this schema, not just omitted from a form, so
+// there is no way for this endpoint to touch anything else.
+export const correctPaymentPeriodSchema = z.object({
+  period: periodField,
 });

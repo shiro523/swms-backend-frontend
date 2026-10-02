@@ -235,6 +235,15 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  // Admin-only correction of an existing payment's period (e.g. a malformed
+  // "October" corrected to "October 2026") — never amount/householdId/
+  // datePaid, and never a new payment.
+  correctPaymentPeriod: (id: string, period: string) =>
+    request<Payment>(`/payments/${id}/period`, {
+      method: "PATCH",
+      body: JSON.stringify({ period }),
+    }),
+
   createNotification: (input: {
     type: "collection" | "payment" | "violation";
     message: string;

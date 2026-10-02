@@ -24,6 +24,16 @@ export const paymentRepository = {
     return prisma.payment.findUnique({ where: { id }, include: PAYMENT_INCLUDE });
   },
 
+  // Admin-only period correction — the signature itself only accepts
+  // `period`, so this can never be used to touch amount/householdId/
+  // datePaid/id even by mistake. Same row, same id, never a new payment —
+  // still subject to the existing @@unique([householdId, period])
+  // constraint, so correcting into a period that household already has a
+  // payment for is still rejected rather than silently colliding.
+  updatePeriod(id: string, period: string) {
+    return prisma.payment.update({ where: { id }, data: { period }, include: PAYMENT_INCLUDE });
+  },
+
   // Creates the payment and its household-specific notification atomically
   // (Batch E) — no purok-leader notification, per the approved design. Both
   // inserts share the payment's own uniqueness constraint

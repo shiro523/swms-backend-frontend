@@ -9,19 +9,29 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
+import { CorrectPaymentPeriodDialog } from "@/components/payments/CorrectPaymentPeriodDialog";
 import { Payment, PaymentStatus } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
-const columns: Column<Payment>[] = [
-  { header: "Household", accessor: (p) => (
-      <span className="font-medium text-ink">{p.representative} <span className="stamp text-[10px] text-ink/40">{p.householdCode}</span></span>
-    ) },
-  { header: "Purok", accessor: (p) => p.purokName },
-  { header: "Period", accessor: (p) => p.period },
-  { header: "Amount", accessor: (p) => (p.status === "unpaid" ? "—" : `₱${p.amount.toFixed(2)}`) },
-  { header: "Date paid", accessor: (p) => p.datePaid ?? "—" },
-  { header: "Status", accessor: (p) => <StatusBadge status={p.status} /> },
-];
+function buildColumns(onCorrected: () => void): Column<Payment>[] {
+  return [
+    { header: "Household", accessor: (p) => (
+        <span className="font-medium text-ink">{p.representative} <span className="stamp text-[10px] text-ink/40">{p.householdCode}</span></span>
+      ) },
+    { header: "Purok", accessor: (p) => p.purokName },
+    { header: "Period", accessor: (p) => p.period },
+    { header: "Amount", accessor: (p) => (p.status === "unpaid" ? "—" : `₱${p.amount.toFixed(2)}`) },
+    { header: "Date paid", accessor: (p) => p.datePaid ?? "—" },
+    { header: "Status", accessor: (p) => <StatusBadge status={p.status} /> },
+    {
+      header: "Actions",
+      // Synthetic "Unpaid" placeholder rows (id starts with "unpaid-") have
+      // no real Payment to correct — only real, already-paid rows get the
+      // action.
+      accessor: (p) => (p.status === "unpaid" ? null : <CorrectPaymentPeriodDialog payment={p} onCorrected={onCorrected} />),
+    },
+  ];
+}
 
 const FILTERS: { label: string; value: PaymentStatus | "all" }[] = [
   { label: "All", value: "all" },
@@ -117,7 +127,7 @@ export default function PaymentsPage() {
         {() => (
           <DataTable
             data={filtered}
-            columns={columns}
+            columns={buildColumns(() => query.reload())}
             searchPlaceholder="Search by household or code…"
             searchKeys={(p) => `${p.representative} ${p.householdCode}`}
             pageSize={10}

@@ -78,4 +78,26 @@ export const paymentService = {
     const row = await paymentRepository.findById(id);
     return mapPayment(row);
   },
+
+  // Admin-only (enforced by requireRole("admin") at the route level) — the
+  // narrow fix for a payment recorded with a malformed period (e.g.
+  // "October" instead of "October 2026") that can never match the current
+  // period again. Never creates a new row or touches amount/householdId/
+  // datePaid — paymentRepository.updatePeriod's own signature makes that
+  // structurally impossible, not just an unchecked convention here.
+  async correctPeriod(id: string, period: string) {
+    const existing = await paymentRepository.findById(id);
+    if (!existing) {
+      throw new HttpError(404, "Payment not found");
+    }
+    try {
+      const row = await paymentRepository.updatePeriod(id, period);
+      return mapPayment(row);
+    } catch (err) {
+      if (isUniqueConflict(err, "payments_household_id_period_key")) {
+        throw new HttpError(409, "This household already has a payment record for that period.");
+      }
+      throw err;
+    }
+  },
 };
