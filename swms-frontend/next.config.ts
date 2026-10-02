@@ -8,6 +8,14 @@ import type { NextConfig } from "next";
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  // Without this, Turbopack walks up from this directory looking for a
+  // lockfile to infer the workspace root, finds one at the repo root too
+  // (../package-lock.json, for the unrelated root-level `npm run dev`
+  // convenience script), and warns about "additional lockfiles." This repo
+  // is swms-frontend itself, not a workspace — pin it explicitly.
+  turbopack: {
+    root: __dirname,
+  },
   async rewrites() {
     return [
       {
