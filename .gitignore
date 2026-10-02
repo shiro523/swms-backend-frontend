@@ -15,6 +15,11 @@ backend-swms/src/generated/
 swms-frontend/.next/
 swms-frontend/tsconfig.tsbuildinfo
 
+# Stray duplicate dir from an accidental rename (2026-10-02) — not part of
+# the actual SWMS source (that's swms-frontend/); ignored so a broad `git
+# add` can't accidentally re-stage its build cache again.
+/frontend/
+
 # Logs
 *.log
 npm-debug.log*
