@@ -4,11 +4,19 @@ import { prisma } from "@/lib/prisma";
 const PAYMENT_INCLUDE = { household: { include: { purok: true } } };
 
 export const paymentRepository = {
+  // Most-recent-paid first, like every other scoped list in this app
+  // (trashLogRepository/notificationRepository both order by date desc) —
+  // household.code as a secondary tiebreak only, never the primary key.
+  // Without the datePaid ordering, two payments for the same household
+  // come back in whatever order Postgres happens to return them (observed
+  // in practice as insertion order, but never guaranteed), so anything
+  // that assumed "last in the list = most recently paid" — the Resident
+  // dashboard's latestPayment — could silently show the wrong payment.
   findMany(where: Record<string, unknown>) {
     return prisma.payment.findMany({
       where,
       include: PAYMENT_INCLUDE,
-      orderBy: { household: { code: "asc" } },
+      orderBy: [{ datePaid: "desc" }, { household: { code: "asc" } }],
     });
   },
 
