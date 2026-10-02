@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
+import { sortPeriodsNewestFirst, splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 import { CorrectPaymentPeriodDialog } from "@/components/payments/CorrectPaymentPeriodDialog";
 import { Payment, PaymentStatus } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
@@ -41,20 +41,57 @@ const FILTERS: { label: string; value: PaymentStatus | "all" }[] = [
 
 export default function PaymentsPage() {
   const [filter, setFilter] = useState<PaymentStatus | "all">("all");
+  const [purokFilter, setPurokFilter] = useState("all");
+  const [periodFilter, setPeriodFilter] = useState("all");
   const query = useApi(
     () =>
-      Promise.all([api.households(), api.payments(), api.currentPaymentPeriod()]).then(
-        ([households, payments, currentPeriod]) => ({ households, payments, currentPeriod: currentPeriod.period }),
+      Promise.all([api.households(), api.payments(), api.currentPaymentPeriod(), api.puroks()]).then(
+        ([households, payments, currentPeriod, puroks]) => ({
+          households,
+          payments,
+          currentPeriod: currentPeriod.period,
+          puroks,
+        }),
       ),
     [],
   );
-  const households = query.data?.households ?? [];
-  const payments = query.data?.payments ?? [];
+  const allHouseholds = query.data?.households ?? [];
+  const allPayments = query.data?.payments ?? [];
   const currentPeriod = query.data?.currentPeriod ?? "";
+  const puroks = query.data?.puroks ?? [];
+
+  // Purok scopes both the household list and the payment rows together, so
+  // the stat cards (paid/unpaid this period) and the table always agree on
+  // which households are in view. "All puroks" deliberately does NOT filter
+  // payments by the active-household list: api.households() leaves out
+  // soft-removed households, but their payments are still official history
+  // and must stay visible here.
+  const households = purokFilter === "all" ? allHouseholds : allHouseholds.filter((h) => h.purokId === purokFilter);
+  const householdIdsInScope = new Set(households.map((h) => h.id));
+  const payments =
+    purokFilter === "all" ? allPayments : allPayments.filter((p) => householdIdsInScope.has(p.householdId));
+
+  // Options are derived from the real payment records on screen, never a
+  // fixed list — a period appears here only once a Payment row actually
+  // exists for it, and automatically includes any future period (November
+  // 2026, December 2026, ...) the moment the first payment for it is
+  // recorded, with no code change. Newest first, by real date.
+  const periodOptions = sortPeriodsNewestFirst(allPayments.map((p) => p.period));
+
+  // If the selected period stops existing (e.g. its only payment was just
+  // moved to another period via Correct Period), fall back to "all" instead
+  // of leaving the table empty under a dropdown value that's no longer an
+  // option.
+  if (periodFilter !== "all" && query.data && !periodOptions.includes(periodFilter)) {
+    setPeriodFilter("all");
+  }
 
   // Paid/unpaid for the current billing period, derived from actual Payment
   // records — never from Payment.status (always "paid", not period-aware)
   // or Household.paymentStatus (means "ever paid," not "paid this period").
+  // Scoped to the purok filter (not the period filter — Paid/Unpaid is
+  // always about the current period, independent of which period the table
+  // below is being browsed for).
   const { paidHouseholdIds, paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(
     households,
     payments,
@@ -82,11 +119,18 @@ export default function PaymentsPage() {
     status: "unpaid",
   }));
 
+  // The period filter only applies to real payment rows (All/Paid) — the
+  // Unpaid tab's synthetic rows have one fixed meaning ("no payment for the
+  // current period yet") that a past-period filter can't meaningfully
+  // narrow, so it's left untouched there.
+  const periodScoped = (rows: Payment[]) =>
+    periodFilter === "all" ? rows : rows.filter((p) => p.period === periodFilter);
+
   const filtered =
     filter === "all"
-      ? payments
+      ? periodScoped(payments)
       : filter === "paid"
-        ? payments.filter((p) => paidHouseholdIds.has(p.householdId))
+        ? periodScoped(payments.filter((p) => paidHouseholdIds.has(p.householdId)))
         : unpaidRows;
 
   const collected = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
@@ -107,7 +151,7 @@ export default function PaymentsPage() {
         <StatCard label="Unpaid this period" value={String(unpaidHouseholds.length)} icon={CircleX} tone="clay" />
       </div>
 
-      <div className="my-4 flex gap-2">
+      <div className="my-4 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => (
           <button
             key={f.value}
@@ -121,6 +165,28 @@ export default function PaymentsPage() {
             {f.label}
           </button>
         ))}
+
+        <select
+          value={purokFilter}
+          onChange={(e) => setPurokFilter(e.target.value)}
+          className="rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink/70"
+        >
+          <option value="all">All puroks</option>
+          {puroks.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        <select
+          value={periodFilter}
+          onChange={(e) => setPeriodFilter(e.target.value)}
+          className="rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink/70"
+        >
+          <option value="all">All periods</option>
+          {periodOptions.map((period) => (
+            <option key={period} value={period}>{period}</option>
+          ))}
+        </select>
       </div>
 
       <AsyncSection query={query}>
@@ -128,8 +194,8 @@ export default function PaymentsPage() {
           <DataTable
             data={filtered}
             columns={buildColumns(() => query.reload())}
-            searchPlaceholder="Search by household or code…"
-            searchKeys={(p) => `${p.representative} ${p.householdCode}`}
+            searchPlaceholder="Search by household name, code, or ID…"
+            searchKeys={(p) => `${p.representative} ${p.householdCode} ${p.householdId}`}
             pageSize={10}
           />
         )}

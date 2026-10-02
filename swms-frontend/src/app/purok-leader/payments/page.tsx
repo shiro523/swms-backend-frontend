@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader, StatCard, Card } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { DataTable, Column } from "@/components/ui/DataTable";
@@ -9,7 +10,7 @@ import type { XlsxColumn } from "@/lib/exportXlsx";
 import { RecordPaymentDialog } from "@/components/households/RecordPaymentDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
+import { sortPeriodsNewestFirst, splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 import { Payment } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
@@ -35,6 +36,7 @@ const columns: Column<Payment>[] = [
 ];
 
 export default function PurokLeaderPaymentsPage() {
+  const [periodFilter, setPeriodFilter] = useState("all");
   const query = useApi(
     () =>
       Promise.all([api.puroks(), api.households(), api.payments(), api.currentPaymentPeriod()]).then(
@@ -55,6 +57,19 @@ export default function PurokLeaderPaymentsPage() {
   const { unpaidHouseholds } = splitHouseholdsByCurrentPeriod(households, payments, currentPeriod);
   const collected = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
 
+  // Derived from the real payment records already fetched — never a fixed
+  // list — so a future period (November 2026, ...) appears here automatically
+  // the moment the first payment for it is recorded, with no code change.
+  // Newest first, by real date.
+  const periodOptions = sortPeriodsNewestFirst(payments.map((p) => p.period));
+
+  // Fall back to "all" if the selected period no longer exists after a reload.
+  if (periodFilter !== "all" && query.data && !periodOptions.includes(periodFilter)) {
+    setPeriodFilter("all");
+  }
+
+  const filteredPayments = periodFilter === "all" ? payments : payments.filter((p) => p.period === periodFilter);
+
   return (
     <div>
       <PageHeader
@@ -62,8 +77,8 @@ export default function PurokLeaderPaymentsPage() {
         title="Payments"
         description={currentPeriod ? `Monthly collection fee status for ${currentPeriod}.` : "Monthly collection fee status for households in your purok."}
         actions={
-          payments.length > 0 ? (
-            <ExportButton filename="my-payments" rows={payments} format="xlsx" columns={xlsxColumns} />
+          filteredPayments.length > 0 ? (
+            <ExportButton filename="my-payments" rows={filteredPayments} format="xlsx" columns={xlsxColumns} />
           ) : undefined
         }
       />
@@ -97,12 +112,25 @@ export default function PurokLeaderPaymentsPage() {
                 </div>
               </Card>
 
-              <div className="mt-4">
+              <div className="mt-4 flex justify-end">
+                <select
+                  value={periodFilter}
+                  onChange={(e) => setPeriodFilter(e.target.value)}
+                  className="rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink/70"
+                >
+                  <option value="all">All periods</option>
+                  {periodOptions.map((period) => (
+                    <option key={period} value={period}>{period}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-2">
                 <DataTable
-                  data={payments}
+                  data={filteredPayments}
                   columns={columns}
                   searchPlaceholder="Search by household or code…"
-                  searchKeys={(p) => `${p.representative} ${p.householdCode}`}
+                  searchKeys={(p) => `${p.representative} ${p.householdCode} ${p.householdId}`}
                   pageSize={10}
                 />
               </div>

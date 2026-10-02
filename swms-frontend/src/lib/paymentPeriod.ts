@@ -20,6 +20,36 @@ function normalizePeriod(period: string): string {
   return period.trim().toLowerCase();
 }
 
+const MONTH_NAMES = [
+  "january", "february", "march", "april", "may", "june",
+  "july", "august", "september", "october", "november", "december",
+];
+
+// Chronological position of a "Month YYYY" period, or null when it isn't in
+// that shape (e.g. a legacy "October" with no year) — never throws.
+function periodSortKey(period: string): number | null {
+  const match = period.trim().match(/^([A-Za-z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const month = MONTH_NAMES.indexOf(match[1].toLowerCase());
+  if (month === -1) return null;
+  return Number(match[2]) * 12 + month;
+}
+
+// Distinct periods, newest first. Well-formed "Month YYYY" periods are
+// ordered by real date (across years); anything unparseable goes last,
+// alphabetically, so a legacy/malformed value can't break or reorder the
+// rest of the list.
+export function sortPeriodsNewestFirst(periods: Iterable<string>): string[] {
+  return Array.from(new Set(periods)).sort((a, b) => {
+    const keyA = periodSortKey(a);
+    const keyB = periodSortKey(b);
+    if (keyA !== null && keyB !== null) return keyB - keyA;
+    if (keyA !== null) return -1;
+    if (keyB !== null) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 export function splitHouseholdsByCurrentPeriod(
   households: Household[],
   payments: Payment[],
