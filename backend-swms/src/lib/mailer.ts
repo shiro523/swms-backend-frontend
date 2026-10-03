@@ -23,17 +23,32 @@ async function createTransport() {
   });
 }
 
+// nodemailer's connectionTimeout/socketTimeout options bound how long ITS
+// OWN timers wait, but some sandboxed network stacks take far longer than
+// that to even report a failed TCP connect (observed: 117s for ECONNREFUSED
+// on a loopback address that previously failed in ~100ms) — nodemailer has
+// nothing to preempt in that case, since the underlying connect attempt
+// itself hasn't returned yet. Racing the whole send against our own timer
+// guarantees callers (forgotPassword's "always respond quickly" contract)
+// never wait longer than this, regardless of what the OS/network is doing.
+const SEND_TIMEOUT_MS = 10_000;
+
 export async function sendPasswordResetEmail(to: string, resetUrl: string) {
   const transporter = await createTransport();
-  await transporter.sendMail({
-    from: config.smtp.from,
-    to,
-    subject: "Reset your Basura Watch password",
-    text: `We received a request to reset your Basura Watch password.\n\nReset it here (expires in 30 minutes): ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
-    html: `
-      <p>We received a request to reset your Basura Watch password.</p>
-      <p><a href="${resetUrl}">Click here to reset your password</a> (expires in 30 minutes).</p>
-      <p>If you didn't request this, you can ignore this email.</p>
-    `,
-  });
+  await Promise.race([
+    transporter.sendMail({
+      from: config.smtp.from,
+      to,
+      subject: "Reset your Basura Watch password",
+      text: `We received a request to reset your Basura Watch password.\n\nReset it here (expires in 30 minutes): ${resetUrl}\n\nIf you didn't request this, you can ignore this email.`,
+      html: `
+        <p>We received a request to reset your Basura Watch password.</p>
+        <p><a href="${resetUrl}">Click here to reset your password</a> (expires in 30 minutes).</p>
+        <p>If you didn't request this, you can ignore this email.</p>
+      `,
+    }),
+    new Promise((_resolve, reject) =>
+      setTimeout(() => reject(new Error("Timed out sending password reset email")), SEND_TIMEOUT_MS),
+    ),
+  ]);
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
-import { Camera, CheckCircle2, ScanLine, TriangleAlert, RotateCcw, AlertCircle } from "lucide-react";
+import { Camera, CheckCircle2, ScanLine, TriangleAlert, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/Primitives";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -13,8 +13,16 @@ function normalizeCode(value: string) {
   return value.trim().toUpperCase();
 }
 
+// Local calendar date as YYYY-MM-DD — not toISOString().slice(0,10), which
+// converts through UTC and can shift the date back by a day for users in a
+// positive UTC offset (e.g. the Philippines, UTC+8). Same fix already
+// applied to admin/trash-logs/page.tsx's toLocalIso().
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 export default function PurokLeaderScanPage() {
@@ -24,7 +32,12 @@ export default function PurokLeaderScanPage() {
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [action, setAction] = useState<"collected" | "violation" | "note">("collected");
+  // No default — the leader must explicitly pick who disposed of the trash
+  // rather than silently falling back to the backend's "representative"
+  // default, which could record an incorrect person for every scan.
+  const [disposedBy, setDisposedBy] = useState<"owner" | "representative" | null>(null);
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   const [purokName, setPurokName] = useState("");
   const [logs, setLogs] = useState<TrashLog[]>([]);
@@ -157,6 +170,7 @@ export default function PurokLeaderScanPage() {
     setCameraError(null);
     setNote("");
     setAction("collected");
+    setDisposedBy(null);
 
     const html5QrCode = scannerRef.current;
     if (!html5QrCode) return;
@@ -188,6 +202,11 @@ export default function PurokLeaderScanPage() {
 
   async function handleAction() {
     if (!selectedHousehold) return;
+    // Guards against double-tap/rapid re-click firing two overlapping
+    // requests for the same household — the actual duplicate-prevention
+    // guarantee still has to come from the backend (see H-5), this only
+    // stops the most common way a user accidentally triggers it.
+    if (submitting) return;
 
     // A field note isn't a collection outcome — logging one would inflate the
     // household's compliance record, so we don't persist it.
@@ -199,10 +218,17 @@ export default function PurokLeaderScanPage() {
       return;
     }
 
+    // Require an explicit disposer choice — never silently fall through to
+    // the backend's default. The "Save action" button is already disabled
+    // in this state; this is a defensive backstop.
+    if (!disposedBy) return;
+
+    setSubmitting(true);
     try {
       const created = await api.createTrashLog({
         householdId: selectedHousehold.id,
         status: action === "violation" ? "violation" : "compliant",
+        disposedBy,
         notes: note || undefined,
       });
 
@@ -214,6 +240,7 @@ export default function PurokLeaderScanPage() {
       setStatusMessage(`Logged ${action === "violation" ? "violation" : "collection"} for ${selectedHousehold.code}.`);
       setDuplicateMessage(null);
       setNote("");
+      setDisposedBy(null);
     } catch (err) {
       setScannerState("error");
       if (err instanceof ApiError && err.status === 409) {
@@ -222,13 +249,15 @@ export default function PurokLeaderScanPage() {
       } else {
         setStatusMessage(err instanceof Error ? err.message : "Failed to save action.");
       }
+    } finally {
+      setSubmitting(false);
     }
   }
 
-  const lastCollection = selectedHousehold
+  const lastCollectionLog = selectedHousehold
     ? logs
         .filter((log) => log.householdId === selectedHousehold.id)
-        .reduce<string | null>((latest, log) => (!latest || log.date > latest ? log.date : latest), null)
+        .reduce<TrashLog | null>((latest, log) => (!latest || log.date > latest.date ? log : latest), null)
     : null;
 
   return (
@@ -313,9 +342,9 @@ export default function PurokLeaderScanPage() {
               <div className="rounded-2xl border border-line bg-paper/70 p-4 text-sm text-ink/70">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-ink">Last collection</span>
-                  <StatusBadge status={selectedHousehold.paymentStatus === "paid" ? "paid" : "unpaid"} />
+                  {lastCollectionLog && <StatusBadge status={lastCollectionLog.status} />}
                 </div>
-                <p className="mt-2 text-sm text-ink/60">{lastCollection ?? "No recent log"}</p>
+                <p className="mt-2 text-sm text-ink/60">{lastCollectionLog?.date ?? "No recent log"}</p>
               </div>
 
               {duplicateMessage && (
@@ -342,6 +371,31 @@ export default function PurokLeaderScanPage() {
                     </button>
                   ))}
                 </div>
+
+                {action !== "note" && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-sm font-semibold text-ink">Who disposed of the trash?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: "owner", label: "Household Representative" },
+                        { key: "representative", label: "Family Member / Other Person" },
+                      ].map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setDisposedBy(option.key as "owner" | "representative")}
+                          className={`rounded-full border px-3 py-1.5 text-sm ${disposedBy === option.key ? "border-pine bg-pine-tint text-pine-dark" : "border-line bg-paper text-ink/65"}`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                    {!disposedBy && (
+                      <p className="text-xs text-clay">Select who disposed of the trash to continue.</p>
+                    )}
+                  </div>
+                )}
+
                 <textarea
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
@@ -351,14 +405,24 @@ export default function PurokLeaderScanPage() {
                 <button
                   type="button"
                   onClick={handleAction}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark"
+                  disabled={submitting || (action !== "note" && !disposedBy)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark disabled:opacity-50"
                 >
-                  <CheckCircle2 size={15} /> Save action
+                  {submitting ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" /> Saving…
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={15} /> Save action
+                    </>
+                  )}
                 </button>
                 <button
                   type="button"
                   onClick={handleRescan}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink/70 hover:border-pine/40"
+                  disabled={submitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink/70 hover:border-pine/40 disabled:opacity-50"
                 >
                   <ScanLine size={15} /> Scan another household
                 </button>

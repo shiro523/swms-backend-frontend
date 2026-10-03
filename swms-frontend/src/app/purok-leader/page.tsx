@@ -7,6 +7,7 @@ import { AsyncSection } from "@/components/ui/AsyncSection";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 
 export default function PurokLeaderDashboard() {
   const query = useApi(
@@ -17,23 +18,29 @@ export default function PurokLeaderDashboard() {
         api.payments(),
         api.trashLogs(),
         api.violations(),
-      ]).then(([puroks, households, payments, trashLogs, violations]) => ({
+        api.currentPaymentPeriod(),
+      ]).then(([puroks, households, payments, trashLogs, violations, currentPeriod]) => ({
         purok: puroks[0],
         households,
         payments,
         trashLogs,
         violations,
+        currentPeriod: currentPeriod.period,
       })),
     [],
   );
 
   return (
     <AsyncSection query={query}>
-      {({ purok, households, payments, trashLogs, violations }) => {
-        const paid = payments.filter((p) => p.status === "paid").length;
-        const unpaid = payments.filter((p) => p.status === "unpaid").length;
+      {({ purok, households, payments, trashLogs, violations, currentPeriod }) => {
+        // Paid/unpaid for the current billing period, derived from actual
+        // Payment records — never from Payment.status (always "paid," not
+        // period-aware) or Household.paymentStatus (means "ever paid," not
+        // "paid this period").
+        const { paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(households, payments, currentPeriod);
+        const paid = paidHouseholds.length;
+        const unpaid = unpaidHouseholds.length;
         const recentLogs = trashLogs.slice(0, 6);
-        const unpaidHouseholds = payments.filter((p) => p.status !== "paid");
 
         return (
           <div>
@@ -91,18 +98,19 @@ export default function PurokLeaderDashboard() {
 
               <Card className="p-5">
                 <p className="text-sm font-semibold text-ink">Unpaid households</p>
+                <p className="text-xs text-ink/50">No recorded payment for {currentPeriod || "the current period"}.</p>
                 <div className="mt-3 divide-y divide-line">
-                  {unpaidHouseholds.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between py-2.5 text-sm">
+                  {unpaidHouseholds.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between py-2.5 text-sm">
                       <div>
-                        <p className="font-medium text-ink">{p.representative}</p>
-                        <p className="text-xs text-ink/45">{p.householdCode} · {p.period}</p>
+                        <p className="font-medium text-ink">{h.representative}</p>
+                        <p className="text-xs text-ink/45">{h.code}</p>
                       </div>
-                      <StatusBadge status={p.status} />
+                      <StatusBadge status="unpaid" />
                     </div>
                   ))}
                   {unpaidHouseholds.length === 0 && (
-                    <p className="py-3 text-sm text-ink/40">All households are paid up for this period.</p>
+                    <p className="py-3 text-sm text-ink/40">All households are paid up for {currentPeriod || "this period"}.</p>
                   )}
                 </div>
               </Card>

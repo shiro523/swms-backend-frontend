@@ -2,6 +2,7 @@
 // login accounts for every role. Usage: npm run db:seed
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/lib/prisma";
+import { assertDestructiveOpsAllowed } from "./guardDestructiveOp";
 
 // ---------------------------------------------------------------------------
 // Data generators (ported from swms-backend/scripts/seed.js so the seeded app
@@ -86,14 +87,17 @@ const payments = households.map((hh, i) => ({
   amount: 75,
   status: hh.paymentStatus,
   datePaid: hh.paymentStatus === "paid" ? `2026-07-0${1 + (i % 9)}` : null,
-  orNumber: hh.paymentStatus === "paid" ? `OR-2026-${String(3000 + i)}` : null,
 }));
 
+// Barangay-wide (no targetPurokId/targetHouseholdId) — visible to every
+// role. Read state is per-user (NotificationRead), not seeded here, so
+// every seeded notification starts unread for every account, matching the
+// schema's actual default (no NotificationRead row = unread).
 const notifications = [
-  { id: "n1", title: "Collection Schedule", message: "Waste collection for Purok 1–3 is scheduled tomorrow, 6:00 AM.", type: "collection", date: "2026-07-09", read: false },
-  { id: "n2", title: "Payment Due Reminder", message: "Your July 2026 waste collection fee (₱75.00) is due on July 15.", type: "payment", date: "2026-07-08", read: false },
-  { id: "n3", title: "Violation Recorded", message: "Improper segregation was recorded during your last collection.", type: "violation", date: "2026-07-06", read: true },
-  { id: "n4", title: "Collection Schedule", message: "Waste collection for Purok 4–5 is scheduled July 11, 6:00 AM.", type: "collection", date: "2026-07-05", read: true },
+  { id: "n1", title: "Collection Schedule", message: "Waste collection for Purok 1–3 is scheduled tomorrow, 6:00 AM.", type: "collection", date: "2026-07-09" },
+  { id: "n2", title: "Payment Due Reminder", message: "Your July 2026 waste collection fee (₱75.00) is due on July 15.", type: "payment", date: "2026-07-08" },
+  { id: "n3", title: "Violation Recorded", message: "Improper segregation was recorded during your last collection.", type: "violation", date: "2026-07-06" },
+  { id: "n4", title: "Collection Schedule", message: "Waste collection for Purok 4–5 is scheduled July 11, 6:00 AM.", type: "collection", date: "2026-07-05" },
 ];
 
 const monthlyCollectionStats = [
@@ -119,6 +123,8 @@ const paymentCollectionStats = [
 // ---------------------------------------------------------------------------
 
 async function seed() {
+  assertDestructiveOpsAllowed("db:seed");
+
   await prisma.$transaction(
     async (tx) => {
       // Wipe existing data (children first) so re-seeding is idempotent.
@@ -182,7 +188,6 @@ async function seed() {
           amount: p.amount,
           status: p.status,
           datePaid: p.datePaid ? new Date(p.datePaid) : null,
-          orNumber: p.orNumber,
         })),
       });
 
@@ -193,7 +198,6 @@ async function seed() {
           message: n.message,
           type: n.type,
           nDate: new Date(n.date),
-          isRead: n.read,
         })),
       });
 

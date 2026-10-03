@@ -6,6 +6,7 @@ import type {
   Purok,
   Role,
   SessionUser,
+  SystemSettings,
   TrashLog,
   Violation,
 } from "./types";
@@ -20,7 +21,7 @@ export interface MonthlyCollectionStat {
 export interface PaymentCollectionStat {
   month: string;
   collected: number;
-  target: number;
+  target: number | null;
 }
 
 export interface Account {
@@ -102,11 +103,34 @@ export const api = {
   // --- data (scoped server-side by the caller's role) ---
   puroks: () => request<Purok[]>("/puroks"),
   households: () => request<Household[]>("/households"),
+  removedHouseholds: () => request<Household[]>("/households?removed=true"),
   household: (id: string) => request<Household>(`/households/${id}`),
   trashLogs: (householdId?: string) => request<TrashLog[]>(`/trash-logs${qs(householdId)}`),
+  trashLog: (id: string) => request<TrashLog>(`/trash-logs/${id}`),
   payments: (householdId?: string) => request<Payment[]>(`/payments${qs(householdId)}`),
+  currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
+  completeViolation: (id: string) => request<Violation>(`/violations/${id}/complete`, { method: "PATCH" }),
   notifications: () => request<NotificationItem[]>("/notifications"),
+  markNotificationRead: (id: string) =>
+    request<NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }),
+  unreadNotificationCount: () => request<{ count: number }>("/notifications/unread-count"),
+  deleteNotification: (id: string) => request<void>(`/notifications/${id}`, { method: "DELETE" }),
+
+  // --- admin-only system settings ---
+  settings: () => request<SystemSettings>("/settings"),
+  updateSettings: (input: {
+    barangayName: string;
+    municipality: string;
+    contactNumber: string;
+    monthlyCollectionFee: number;
+    collectionDays: string;
+    collectionTime: string;
+  }) =>
+    request<SystemSettings>("/settings", {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
   monthlyCollectionStats: () => request<MonthlyCollectionStat[]>("/stats/monthly-collection"),
   paymentCollectionStats: () => request<PaymentCollectionStat[]>("/stats/payment-collection"),
 
@@ -152,6 +176,28 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  updateFamilyMember: (
+    householdId: string,
+    memberId: string,
+    input: { name?: string; relation?: string; age?: number },
+  ) =>
+    request<FamilyMember>(`/households/${householdId}/members/${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    }),
+
+  removeFamilyMember: (householdId: string, memberId: string) =>
+    request<void>(`/households/${householdId}/members/${memberId}`, { method: "DELETE" }),
+
+  removeHousehold: (id: string, reason: string) =>
+    request<Household>(`/households/${id}/remove`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  restoreHousehold: (id: string) =>
+    request<Household>(`/households/${id}/restore`, { method: "POST" }),
+  deleteHouseholdPermanently: (id: string) => request<void>(`/households/${id}`, { method: "DELETE" }),
+
   createPurok: (input: {
     name: string;
     leaderName: string;
@@ -173,12 +219,15 @@ export const api = {
       body: JSON.stringify(input),
     }),
   purokAccounts: (id: string) => request<PurokAccounts>(`/puroks/${id}/accounts`),
+  archivedPuroks: () => request<Purok[]>("/puroks?archived=true"),
+  archivePurok: (id: string) => request<Purok>(`/puroks/${id}/archive`, { method: "POST" }),
+  restorePurok: (id: string) => request<Purok>(`/puroks/${id}/restore`, { method: "POST" }),
+  deletePurokPermanently: (id: string) => request<void>(`/puroks/${id}`, { method: "DELETE" }),
 
   createPayment: (input: {
     householdId: string;
     period: string;
     amount: number;
-    orNumber?: string;
     datePaid?: string;
   }) =>
     request<Payment>("/payments", {
@@ -186,11 +235,21 @@ export const api = {
       body: JSON.stringify(input),
     }),
 
+  // Admin-only correction of an existing payment's period (e.g. a malformed
+  // "October" corrected to "October 2026") — never amount/householdId/
+  // datePaid, and never a new payment.
+  correctPaymentPeriod: (id: string, period: string) =>
+    request<Payment>(`/payments/${id}/period`, {
+      method: "PATCH",
+      body: JSON.stringify({ period }),
+    }),
+
   createNotification: (input: {
     type: "collection" | "payment" | "violation";
     message: string;
     title?: string;
     targetPurokId?: string;
+    targetHouseholdId?: string;
   }) =>
     request<NotificationItem>("/notifications", {
       method: "POST",

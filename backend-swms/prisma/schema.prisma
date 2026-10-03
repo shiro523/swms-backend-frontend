@@ -20,6 +20,9 @@ model Purok {
   households     Household[]
   users          User[]
   notifications  Notification[]
+  // Null = active. Set = archived (recoverable for 30 days from this
+  // timestamp; see purok.service.ts for the restore/permanent-delete rules).
+  archivedAt     DateTime?      @map("archived_at")
 
   @@map("puroks")
 }
@@ -40,6 +43,17 @@ model Household {
   violations     Violation[]
   payments       Payment[]
   users          User[]
+  notifications  Notification[]
+  // Null = active. Set = removed (resident/household permanently left the
+  // barangay) — mirrors Purok.archivedAt's exact pattern. Never
+  // hard-deletes: all historical trash logs, violations, payments, and
+  // family members remain fully intact, exactly as they were.
+  removedAt      DateTime?      @map("removed_at")
+  removalReason  String?        @map("removal_reason")
+  // Name snapshot of who performed the removal, taken at removal time —
+  // mirrors Violation.resolvedByName's exact pattern rather than a foreign
+  // key to User.
+  removedByName  String?        @map("removed_by_name")
 
   @@index([purokId])
   @@map("households")
@@ -70,6 +84,7 @@ model TrashLog {
   createdAt   DateTime  @default(now()) @map("created_at")
 
   @@index([householdId])
+  @@unique([householdId, logDate])
   @@map("trash_logs")
 }
 
@@ -81,6 +96,16 @@ model Violation {
   vDate       DateTime  @map("v_date") @db.Date
   isRepeat    Boolean   @default(false) @map("is_repeat")
   notes       String    @default("")
+  // Lifecycle (Batch H): "active" | "completed". Plain string, matching this
+  // schema's existing status-field convention (TrashLog.status, Payment.status)
+  // rather than a Prisma enum. Completed violations are never deleted — they
+  // remain permanent history, and still count toward isRepeat detection.
+  status         String    @default("active")
+  resolvedAt     DateTime? @map("resolved_at")
+  // Name snapshot of the staff member who completed it, taken at completion
+  // time — mirrors TrashLog.collector's exact pattern rather than a foreign
+  // key to User (no other relation in this schema points at User).
+  resolvedByName String?   @map("resolved_by_name")
 
   @@index([householdId])
   @@map("violations")
@@ -94,23 +119,59 @@ model Payment {
   amount      Decimal   @db.Decimal(10, 2)
   status      String
   datePaid    DateTime? @map("date_paid") @db.Date
-  orNumber    String?   @map("or_number")
 
+  // Deliberately NOT unique on (householdId, period): the real business
+  // rule is weekly Sunday collections, and a household may make multiple
+  // payments toward the same collection period (partial payments, or more
+  // than one installment) — see commit history for the removal of the
+  // (householdId, period) unique constraint that used to block this.
+  // Paid/unpaid status (splitHouseholdsByCurrentPeriod, frontend) only
+  // checks whether at least one matching-period payment EXISTS, so having
+  // several rows for the same period is unaffected by that logic.
   @@index([householdId])
   @@map("payments")
 }
 
 model Notification {
-  id            String   @id
-  title         String
-  message       String
-  type          String
-  nDate         DateTime @map("n_date") @db.Date
-  isRead        Boolean  @default(false) @map("is_read")
-  targetPurokId String?  @map("target_purok_id")
-  targetPurok   Purok?   @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
+  id                String             @id
+  title             String
+  message           String
+  type              String
+  nDate             DateTime           @map("n_date") @db.Date
+  targetPurokId     String?            @map("target_purok_id")
+  targetPurok       Purok?             @relation(fields: [targetPurokId], references: [id], onDelete: Cascade)
+  targetHouseholdId String?            @map("target_household_id")
+  targetHousehold   Household?         @relation(fields: [targetHouseholdId], references: [id], onDelete: Cascade)
+  // Distinguishes, within a purok-wide notification, an Admin announcement
+  // meant for that purok's residents too (false, the default — restores the
+  // pre-Batch-E behavior for every existing row) from an automatic
+  // violation leader-alert meant for the purok leader only (true), which
+  // must never reach the unrelated resident whose household wasn't involved
+  // (Batch E correction).
+  leaderOnly        Boolean            @default(false) @map("leader_only")
+  reads             NotificationRead[]
 
+  @@index([targetPurokId])
+  @@index([targetHouseholdId])
   @@map("notifications")
+}
+
+// Per-user read state — replaces the old shared Notification.isRead boolean
+// (Batch E). A row's presence means that specific user has read that specific
+// notification; its absence means unread, for that user only. The composite
+// PK is both the uniqueness guarantee and the natural upsert key.
+model NotificationRead {
+  notificationId String       @map("notification_id")
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  userId         Int          @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  readAt         DateTime     @default(now()) @map("read_at")
+
+  @@id([notificationId, userId])
+  @@index([userId])
+  @@map("notification_reads")
 }
 
 model MonthlyCollectionStat {
@@ -132,6 +193,22 @@ model PaymentCollectionStat {
   @@map("payment_collection_stats")
 }
 
+// Singleton system-wide configuration (Batch F) — always exactly one row,
+// id fixed at 1. Neutral defaults (empty strings, zero fee) rather than
+// fabricated production data; the admin fills these in themselves.
+model SystemSettings {
+  id                   Int      @id @default(1)
+  barangayName         String   @default("") @map("barangay_name")
+  municipality         String   @default("")
+  contactNumber        String   @default("") @map("contact_number")
+  monthlyCollectionFee Decimal  @default(0) @db.Decimal(10, 2) @map("monthly_collection_fee")
+  collectionDays       String   @default("") @map("collection_days")
+  collectionTime       String   @default("") @map("collection_time")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
 model User {
   id                  Int        @id @default(autoincrement())
   username            String     @unique
@@ -146,6 +223,12 @@ model User {
   purokId             String?    @map("purok_id")
   purok               Purok?     @relation(fields: [purokId], references: [id], onDelete: SetNull)
   createdAt           DateTime   @default(now()) @map("created_at")
+  // Bumped on security-sensitive events (currently: password reset) to
+  // invalidate any previously issued JWTs — see token.ts/auth.middleware.ts.
+  tokenVersion        Int        @default(0) @map("token_version")
+  notificationReads   NotificationRead[]
 
+  @@index([householdId])
+  @@index([purokId])
   @@map("users")
 }

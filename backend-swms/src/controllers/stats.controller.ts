@@ -2,11 +2,11 @@ import type { Request, Response } from "express";
 import { statsService } from "@/services/stats.service";
 
 export const statsController = {
-  async monthlyCollection(_req: Request, res: Response) {
-    res.json(await statsService.monthlyCollection());
+  async monthlyCollection(req: Request, res: Response) {
+    res.json(await statsService.monthlyCollection(req.user!));
   },
 
-  async paymentCollection(_req: Request, res: Response) {
-    res.json(await statsService.paymentCollection());
+  async paymentCollection(req: Request, res: Response) {
+    res.json(await statsService.paymentCollection(req.user!));
   },
 };

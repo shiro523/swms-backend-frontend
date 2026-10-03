@@ -15,6 +15,10 @@ export function mapPurok(p: any) {
     leader: p.leaderName,
     households: Number(p._count?.households ?? 0),
     complianceRate: Number(p.complianceRate),
+    // ISO string (or null if active) — the frontend uses this only for
+    // display/countdown purposes; the actual 30-day restore/delete gates are
+    // always re-checked server-side, never trusted from this value alone.
+    archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
   };
 }
 
@@ -42,6 +46,14 @@ export function mapHousehold(h: any) {
     complianceRate: Number(h.complianceRate),
     username: h.users?.[0]?.username ?? null,
     email: h.users?.[0]?.email ?? null,
+    // The resident login account's own creation date — already fetched via
+    // HOUSEHOLD_INCLUDE's `users` relation (see household.repository.ts),
+    // just not previously surfaced. Never exposes passwordHash/resetTokenHash
+    // or any other field from that row.
+    accountCreatedAt: h.users?.[0]?.createdAt ? h.users[0].createdAt.toISOString() : null,
+    removedAt: h.removedAt ? h.removedAt.toISOString() : null,
+    removalReason: h.removalReason ?? null,
+    removedByName: h.removedByName ?? null,
   };
 }
 
@@ -72,6 +84,9 @@ export function mapViolation(v: any) {
     date: formatDate(v.vDate),
     isRepeat: v.isRepeat,
     notes: v.notes,
+    status: v.status,
+    resolvedAt: v.resolvedAt ? v.resolvedAt.toISOString() : null,
+    resolvedByName: v.resolvedByName ?? null,
   };
 }
 
@@ -86,7 +101,6 @@ export function mapPayment(p: any) {
     amount: Number(p.amount),
     status: p.status,
     datePaid: p.datePaid ? formatDate(p.datePaid) : undefined,
-    orNumber: p.orNumber ?? undefined,
   };
 }
 
@@ -97,8 +111,11 @@ export function mapNotification(n: any) {
     message: n.message,
     type: n.type,
     date: formatDate(n.nDate),
-    read: n.isRead,
+    // Per-user read state (Batch E) — `reads` is pre-filtered by the
+    // repository to just the current viewer's own row, if any.
+    read: (n.reads?.length ?? 0) > 0,
     targetPurokName: n.targetPurok?.name ?? null,
+    targetHouseholdCode: n.targetHousehold?.code ?? null,
   };
 }
 
@@ -111,6 +128,9 @@ export function mapUser(u: any) {
     email: u.email ?? null,
     householdId: u.householdId ?? null,
     purokId: u.purokId ?? null,
+    // Needed internally by signToken(); auth.controller.ts strips this
+    // before sending the user object to the client.
+    tokenVersion: u.tokenVersion,
   };
 }
 
@@ -123,5 +143,17 @@ export function mapAccount(u: any) {
     email: u.email,
     role: u.role,
     householdCode: u.household?.code ?? null,
+  };
+}
+
+export function mapSettings(s: any) {
+  return {
+    barangayName: s.barangayName,
+    municipality: s.municipality,
+    contactNumber: s.contactNumber,
+    monthlyCollectionFee: Number(s.monthlyCollectionFee),
+    collectionDays: s.collectionDays,
+    collectionTime: s.collectionTime,
+    updatedAt: s.updatedAt.toISOString(),
   };
 }

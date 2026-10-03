@@ -6,4 +6,8 @@ export const violationController = {
     const householdId = typeof req.query.householdId === "string" ? req.query.householdId : undefined;
     res.json(await violationService.list(req.user!, householdId));
   },
+
+  async complete(req: Request, res: Response) {
+    res.json(await violationService.complete(req.user!, String(req.params.id)));
+  },
 };

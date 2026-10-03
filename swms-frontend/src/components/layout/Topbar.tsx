@@ -2,11 +2,13 @@
 
 import { Bell, LogOut, Menu } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { Role } from "@/lib/types";
 import { ROLE_LABEL } from "@/lib/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useApi } from "@/hooks/useApi";
+import { api } from "@/lib/api";
 import { MobileNav } from "./MobileNav";
 
 export function Topbar({ role, userName }: { role: Role; userName: string }) {
@@ -14,6 +16,13 @@ export function Topbar({ role, userName }: { role: Role; userName: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Re-fetches on every route change — the server is authoritative for
+  // unread state (Batch E), so navigating away from the notifications page
+  // after reading something is enough to keep this in sync, with no polling.
+  const unread = useApi(() => api.unreadNotificationCount(), [pathname]);
+  const hasUnread = (unread.data?.count ?? 0) > 0;
 
   const displayName = user?.name ?? userName;
 
@@ -51,7 +60,7 @@ export function Topbar({ role, userName }: { role: Role; userName: string }) {
             aria-label="Notifications"
           >
             <Bell size={17} />
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-clay" />
+            {hasUnread && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-clay" />}
           </Link>
 
           <div className="relative">

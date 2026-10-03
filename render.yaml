@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: swms-backend
+    runtime: node
+    rootDir: backend-swms
+    plan: free
+    buildCommand: npm install && npm run build
+    # Applies any pending migrations (prisma migrate deploy — never
+    # migrate dev, which is interactive/dev-only) on every deploy and
+    # restart before starting the server. Idempotent: a no-op when there's
+    # nothing new to apply.
+    startCommand: npm run db:migrate:deploy && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Set these in the Render dashboard — never commit real values here.
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # The deployed Vercel frontend's URL (e.g. https://your-app.vercel.app)
+      - key: FRONTEND_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false

@@ -30,7 +30,10 @@ export default function ResidentDashboard() {
   return (
     <AsyncSection query={query}>
       {({ household, payments, trashLogs, violations, notifications }) => {
-        const latestPayment = payments[payments.length - 1];
+        // api.payments() now comes back most-recent-paid first (matching
+        // every other date-ordered list in this app) — index 0, not the
+        // last element.
+        const latestPayment = payments[0];
         const recentLogs = trashLogs.slice(0, 4);
         const nextCollection = notifications.find((n) => n.type === "collection");
 

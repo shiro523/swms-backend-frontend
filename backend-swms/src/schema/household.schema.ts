@@ -1,15 +1,15 @@
 import { z } from "zod";
 
 const memberInput = z.object({
-  name: z.string().trim().min(1),
-  relation: z.string().trim().optional(),
-  age: z.coerce.number().int(),
+  name: z.string().trim().min(1).max(120),
+  relation: z.string().trim().max(60).optional(),
+  age: z.coerce.number().int().min(0, "Age must be between 0 and 120.").max(120, "Age must be between 0 and 120."),
 });
 
 export const createHouseholdSchema = z.object({
-  representative: z.string().trim().min(1, "Representative, address, contact number, and purok are required."),
-  address: z.string().trim().min(1, "Representative, address, contact number, and purok are required."),
-  contactNumber: z.string().trim().min(1, "Representative, address, contact number, and purok are required."),
+  representative: z.string().trim().min(1, "Representative, address, contact number, and purok are required.").max(120),
+  address: z.string().trim().min(1, "Representative, address, contact number, and purok are required.").max(150),
+  contactNumber: z.string().trim().min(1, "Representative, address, contact number, and purok are required.").max(40),
   purokId: z.string().trim().optional(),
   members: z.array(memberInput).optional().default([]),
   // A resident login account is created alongside the household.
@@ -20,16 +20,37 @@ export const createHouseholdSchema = z.object({
 
 export const updateHouseholdSchema = z
   .object({
-    representative: z.string().trim().min(1).optional(),
-    contactNumber: z.string().trim().min(1).optional(),
-    address: z.string().trim().min(1).optional(),
+    representative: z.string().trim().min(1).max(120).optional(),
+    contactNumber: z.string().trim().min(1).max(40).optional(),
+    address: z.string().trim().min(1).max(150).optional(),
     username: z.string().trim().min(3).optional(),
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: "Nothing to update." });
 
-export const addFamilyMemberSchema = z.object({
-  name: z.string().trim().min(1, "Name and a valid age are required."),
-  relation: z.string().trim().optional(),
-  age: z.coerce.number().int({ message: "Name and a valid age are required." }),
+export const removeHouseholdSchema = z.object({
+  reason: z.string().trim().min(1, "A removal reason is required.").max(300),
 });
+
+export const addFamilyMemberSchema = z.object({
+  name: z.string().trim().min(1, "Name and a valid age are required.").max(120),
+  relation: z.string().trim().max(60).optional(),
+  age: z.coerce
+    .number()
+    .int({ message: "Name and a valid age are required." })
+    .min(0, "Age must be between 0 and 120.")
+    .max(120, "Age must be between 0 and 120."),
+});
+
+export const updateFamilyMemberSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    relation: z.string().trim().max(60).optional(),
+    age: z.coerce
+      .number()
+      .int()
+      .min(0, "Age must be between 0 and 120.")
+      .max(120, "Age must be between 0 and 120.")
+      .optional(),
+  })
+  .refine((data) => Object.keys(data).length > 0, { message: "Nothing to update." });

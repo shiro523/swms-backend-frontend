@@ -19,16 +19,30 @@ export function RecordPaymentDialog({
 
   const [period, setPeriod] = useState("");
   const [amount, setAmount] = useState("");
-  const [orNumber, setOrNumber] = useState("");
   const [datePaid, setDatePaid] = useState("");
 
+  // Pre-fills with the server's own canonical current period so the common
+  // case — "record a payment for the period that's due right now" — just
+  // works without the admin/leader having to type it from memory. This is
+  // the actual fix for households staying "Unpaid This Period" after a
+  // successful payment: the field used to always start blank, so any
+  // validly-formatted but wrong month (easy to type without noticing) would
+  // save fine yet never match splitHouseholdsByCurrentPeriod's comparison.
+  // Still fully editable — recording a late/backdated payment for a
+  // different period still works exactly as before.
   const openDialog = () => {
     setPeriod("");
     setAmount("");
-    setOrNumber("");
     setDatePaid("");
     setError(null);
     setOpen(true);
+    api
+      .currentPaymentPeriod()
+      .then(({ period: current }) => setPeriod(current))
+      .catch(() => {
+        // Non-fatal: the field just stays blank, exactly like before this
+        // fix, and the admin/leader can still type it manually.
+      });
   };
 
   const close = () => {
@@ -45,7 +59,6 @@ export function RecordPaymentDialog({
         householdId,
         period: period.trim(),
         amount: Number(amount),
-        orNumber: orNumber.trim() || undefined,
         datePaid: datePaid || undefined,
       });
       onRecorded(payment);
@@ -83,22 +96,17 @@ export function RecordPaymentDialog({
               required
             />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Amount (₱)">
-              <input
-                type="number"
-                step="0.01"
-                min="0.01"
-                className={inputClass}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-            </Field>
-            <Field label="OR number (optional)">
-              <input className={inputClass} value={orNumber} onChange={(e) => setOrNumber(e.target.value)} />
-            </Field>
-          </div>
+          <Field label="Amount (₱)">
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              className={inputClass}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </Field>
           <Field label="Date paid (optional — defaults to today)">
             <input type="date" className={inputClass} value={datePaid} onChange={(e) => setDatePaid(e.target.value)} />
           </Field>

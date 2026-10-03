@@ -92,4 +92,51 @@ export const householdRepository = {
   addMember(data: { id: string; householdId: string; name: string; relation: string; age: number }) {
     return prisma.familyMember.create({ data });
   },
+
+  findMemberById(id: string) {
+    return prisma.familyMember.findUnique({ where: { id } });
+  },
+
+  updateMember(id: string, data: { name?: string; relation?: string; age?: number }) {
+    return prisma.familyMember.update({ where: { id }, data });
+  },
+
+  deleteMember(id: string) {
+    return prisma.familyMember.delete({ where: { id } });
+  },
+
+  // Soft-removal only — mirrors purokRepository's archive()/restore() exact
+  // pattern. Never touches FamilyMember/TrashLog/Violation/Payment; all
+  // historical records stay exactly as they were.
+  remove(id: string, data: { removedAt: Date; removalReason: string; removedByName: string }) {
+    return prisma.household.update({ where: { id }, data, include: HOUSEHOLD_INCLUDE });
+  },
+
+  restore(id: string) {
+    return prisma.household.update({
+      where: { id },
+      data: { removedAt: null, removalReason: null, removedByName: null },
+      include: HOUSEHOLD_INCLUDE,
+    });
+  },
+
+  // Only ever called after householdService's removed-state check passes.
+  // The resident account must go first: User.householdId is onDelete:
+  // SetNull (not Cascade), so deleting the household first would only
+  // orphan that login (householdId -> null), never remove it. Scoped to
+  // role: "resident" specifically — mirrors purokRepository.deleteWithLeader's
+  // exact reasoning, never a general user-delete.
+  //
+  // Deleting the household row itself then cascades automatically per
+  // schema.prisma: FamilyMember, TrashLog, Violation, Payment, and any
+  // household-targeted Notification (which in turn cascades its own
+  // NotificationReads) are all onDelete: Cascade on householdId/
+  // targetHouseholdId. Nothing else references a household, so nothing
+  // else needs to be touched here.
+  deleteWithResident(id: string) {
+    return prisma.$transaction([
+      prisma.user.deleteMany({ where: { householdId: id, role: "resident" } }),
+      prisma.household.delete({ where: { id } }),
+    ]);
+  },
 };

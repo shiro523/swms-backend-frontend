@@ -11,6 +11,7 @@ import {
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 
 export default function AdminDashboard() {
   const query = useApi(
@@ -22,13 +23,15 @@ export default function AdminDashboard() {
         api.puroks(),
         api.monthlyCollectionStats(),
         api.trashLogs(),
-      ]).then(([households, payments, violations, puroks, monthly, logs]) => ({
+        api.currentPaymentPeriod(),
+      ]).then(([households, payments, violations, puroks, monthly, logs, currentPeriod]) => ({
         households,
         payments,
         violations,
         puroks,
         monthly,
         logs,
+        currentPeriod: currentPeriod.period,
       })),
     [],
   );
@@ -42,18 +45,64 @@ export default function AdminDashboard() {
       />
 
       <AsyncSection query={query}>
-        {({ households, payments, violations, puroks, monthly, logs }) => {
-          const paid = payments.filter((p) => p.status === "paid").length;
-          const unpaid = payments.filter((p) => p.status === "unpaid").length;
+        {({ households, payments, violations, puroks, monthly, logs, currentPeriod }) => {
+          // Paid/unpaid for the current billing period, derived from actual
+          // Payment records matched against the server's authoritative
+          // current-period label — never from Payment.status (always "paid",
+          // not period-aware) or Household.paymentStatus (means "ever paid,"
+          // not "paid this period").
+          const { paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(households, payments, currentPeriod);
+          const paid = paidHouseholds.length;
+          const unpaid = unpaidHouseholds.length;
           const recentLogs = logs.slice(0, 6);
+
+          const avgCompliance =
+            puroks.length > 0
+              ? Math.round(puroks.reduce((sum, p) => sum + p.complianceRate, 0) / puroks.length)
+              : null;
+
+          // Month-over-month delta computed from the same live monthly stats
+          // already fetched (C-1) — not a separate/fabricated metric.
+          const monthRate = (m: { compliant: number; violations: number; missed: number }) => {
+            const total = m.compliant + m.violations + m.missed;
+            return total > 0 ? (m.compliant / total) * 100 : null;
+          };
+          const currentMonth = monthly[monthly.length - 1];
+          const previousMonth = monthly.length > 1 ? monthly[monthly.length - 2] : undefined;
+          const currentRate = currentMonth ? monthRate(currentMonth) : null;
+          const previousRate = previousMonth ? monthRate(previousMonth) : null;
+          const complianceDelta =
+            currentRate !== null && previousRate !== null
+              ? Math.round(currentRate) - Math.round(previousRate)
+              : null;
+          const complianceDeltaLabel =
+            complianceDelta === null
+              ? "No prior-month data yet"
+              : complianceDelta === 0
+                ? "No change vs last month"
+                : `${complianceDelta > 0 ? "+" : ""}${complianceDelta}pts vs last month`;
+
+          const periodCaption = currentPeriod ? `${currentPeriod} collection period` : "Current collection period";
 
           return (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <StatCard label="Total households" value={String(households.length)} sub={`${puroks.length} puroks`} icon={Home} tone="pine" />
                 <StatCard label="Paid this period" value={String(paid)} sub={`${unpaid} unpaid`} icon={Wallet} tone="azure" />
-                <StatCard label="Open violations" value={String(violations.length)} sub="Last 28 days" icon={AlertTriangle} tone="clay" />
-                <StatCard label="Avg. compliance" value="87%" sub="+3pts vs last month" icon={MapPinned} tone="gold" />
+                <StatCard
+                  label="Open violations"
+                  value={String(violations.filter((v) => v.status === "active").length)}
+                  sub="Currently active"
+                  icon={AlertTriangle}
+                  tone="clay"
+                />
+                <StatCard
+                  label="Avg. compliance"
+                  value={avgCompliance !== null ? `${avgCompliance}%` : "—"}
+                  sub={complianceDeltaLabel}
+                  icon={MapPinned}
+                  tone="gold"
+                />
               </div>
 
               <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -64,7 +113,7 @@ export default function AdminDashboard() {
                 </Card>
                 <Card className="p-5">
                   <p className="text-sm font-semibold text-ink">Paid vs. unpaid households</p>
-                  <p className="text-xs text-ink/50">July 2026 collection period</p>
+                  <p className="text-xs text-ink/50">{periodCaption}</p>
                   <PaidUnpaidPie paid={paid} unpaid={unpaid} />
                 </Card>
               </div>

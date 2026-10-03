@@ -11,7 +11,10 @@ function fallbackUserName(role: Role) {
     case "admin":
       return "Barangay Admin";
     case "purok-leader":
-      return "Rosario Dizon";
+      // Was a hardcoded real person's name from old seed data — a signed-in
+      // leader could briefly see someone else's name while /api/auth/me is
+      // still loading. Neutral placeholder instead.
+      return "Loading…";
     default:
       return "Household Resident";
   }

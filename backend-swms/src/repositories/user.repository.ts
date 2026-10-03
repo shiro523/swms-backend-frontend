@@ -5,8 +5,18 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { username } });
   },
 
+  // Includes the user's purok archived state and (for a resident) household
+  // removed state — authRequired() reads both on every request to keep a
+  // purok-leader's/resident's operational access in sync with the live
+  // archive/removal state, never trusting the JWT's stale claim.
   findById(id: number) {
-    return prisma.user.findUnique({ where: { id } });
+    return prisma.user.findUnique({
+      where: { id },
+      include: {
+        purok: { select: { archivedAt: true } },
+        household: { select: { removedAt: true } },
+      },
+    });
   },
 
   findByEmail(email: string) {
@@ -24,10 +34,28 @@ export const userRepository = {
     });
   },
 
+  // Bumps tokenVersion in the same atomic update as the password change —
+  // any JWT issued before this moment fails authRequired()'s version check
+  // on its very next request, regardless of its expiry.
   updatePasswordAndClearReset(id: number, passwordHash: string) {
     return prisma.user.update({
       where: { id },
-      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null },
+      data: {
+        passwordHash,
+        resetTokenHash: null,
+        resetTokenExpiresAt: null,
+        tokenVersion: { increment: 1 },
+      },
+    });
+  },
+
+  // Same tokenVersion-bump idiom as above, but on its own — logout (Batch J)
+  // only ever needs to invalidate existing sessions, never touches
+  // passwordHash/resetToken fields the way a password reset does.
+  incrementTokenVersion(id: number) {
+    return prisma.user.update({
+      where: { id },
+      data: { tokenVersion: { increment: 1 } },
     });
   },
 

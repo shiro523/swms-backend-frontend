@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 export const createPurokSchema = z.object({
-  name: z.string().trim().min(1, "Purok name and leader name are required."),
-  leaderName: z.string().trim().min(1, "Purok name and leader name are required."),
+  name: z.string().trim().min(1, "Purok name and leader name are required.").max(120),
+  leaderName: z.string().trim().min(1, "Purok name and leader name are required.").max(120),
   complianceRate: z.coerce.number().min(0).max(100).optional().default(100),
   // A purok-leader login account is created alongside the purok.
   username: z.string().trim().min(3, "Username, password, and email are required for the leader account."),
@@ -12,8 +12,8 @@ export const createPurokSchema = z.object({
 
 export const updatePurokSchema = z
   .object({
-    name: z.string().trim().min(1).optional(),
-    leaderName: z.string().trim().min(1).optional(),
+    name: z.string().trim().min(1).max(120).optional(),
+    leaderName: z.string().trim().min(1).max(120).optional(),
     username: z.string().trim().min(3).optional(),
     email: z.string().trim().toLowerCase().email("Enter a valid email address.").optional(),
   })

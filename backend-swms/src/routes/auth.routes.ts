@@ -3,11 +3,12 @@ import { authController } from "@/controllers/auth.controller";
 import { validateBody } from "@/middlewares/validate.middleware";
 import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from "@/schema/auth.schema";
 import { authRequired } from "@/middlewares/auth.middleware";
+import { loginRateLimiter, forgotPasswordRateLimiter } from "@/middlewares/rateLimit.middleware";
 
 const router = Router();
 
 // POST /api/auth/login
-router.post("/login", validateBody(loginSchema), authController.login);
+router.post("/login", loginRateLimiter, validateBody(loginSchema), authController.login);
 
 // POST /api/auth/logout
 router.post("/logout", authController.logout);
@@ -16,7 +17,7 @@ router.post("/logout", authController.logout);
 router.get("/me", authRequired, authController.me);
 
 // POST /api/auth/forgot-password — emails a reset link if the address is registered
-router.post("/forgot-password", validateBody(forgotPasswordSchema), authController.forgotPassword);
+router.post("/forgot-password", forgotPasswordRateLimiter, validateBody(forgotPasswordSchema), authController.forgotPassword);
 
 // POST /api/auth/reset-password — consumes the token from the emailed link
 router.post("/reset-password", validateBody(resetPasswordSchema), authController.resetPassword);
