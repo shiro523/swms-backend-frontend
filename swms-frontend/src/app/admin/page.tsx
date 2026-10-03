@@ -9,32 +9,14 @@ import {
   PaidUnpaidPie,
 } from "@/components/charts/DashboardCharts";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ViewAllLink } from "@/components/ui/ViewAllLink";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
 
 export default function AdminDashboard() {
-  const query = useApi(
-    () =>
-      Promise.all([
-        api.households(),
-        api.payments(),
-        api.violations(),
-        api.puroks(),
-        api.monthlyCollectionStats(),
-        api.trashLogs(),
-        api.currentPaymentPeriod(),
-      ]).then(([households, payments, violations, puroks, monthly, logs, currentPeriod]) => ({
-        households,
-        payments,
-        violations,
-        puroks,
-        monthly,
-        logs,
-        currentPeriod: currentPeriod.period,
-      })),
-    [],
-  );
+  // One summary request — the counts are computed server-side instead of
+  // downloading every household, payment, violation, and trash log.
+  const query = useApi(() => api.adminDashboard(), []);
 
   return (
     <div>
@@ -45,20 +27,17 @@ export default function AdminDashboard() {
       />
 
       <AsyncSection query={query}>
-        {({ households, payments, violations, puroks, monthly, logs, currentPeriod }) => {
-          // Paid/unpaid for the current billing period, derived from actual
-          // Payment records matched against the server's authoritative
-          // current-period label — never from Payment.status (always "paid",
-          // not period-aware) or Household.paymentStatus (means "ever paid,"
-          // not "paid this period").
-          const { paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(households, payments, currentPeriod);
-          const paid = paidHouseholds.length;
-          const unpaid = unpaidHouseholds.length;
-          const recentLogs = logs.slice(0, 6);
+        {({ totalHouseholds, paid, unpaid, newHouseholds, openViolations, puroks, monthly, recentLogs, currentPeriod }) => {
+          // paid/unpaid are for the current billing period, computed by the
+          // server from actual Payment records with the same rule as
+          // splitHouseholdsByCurrentPeriod (see stats.repository.ts).
 
+          // Average over puroks that have collection records; puroks with
+          // none have no rate (null) and are left out rather than counted as 100%.
+          const ratedPuroks = puroks.flatMap((p) => (p.complianceRate === null ? [] : [p.complianceRate]));
           const avgCompliance =
-            puroks.length > 0
-              ? Math.round(puroks.reduce((sum, p) => sum + p.complianceRate, 0) / puroks.length)
+            ratedPuroks.length > 0
+              ? Math.round(ratedPuroks.reduce((sum, rate) => sum + rate, 0) / ratedPuroks.length)
               : null;
 
           // Month-over-month delta computed from the same live monthly stats
@@ -87,11 +66,17 @@ export default function AdminDashboard() {
           return (
             <>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard label="Total households" value={String(households.length)} sub={`${puroks.length} puroks`} icon={Home} tone="pine" />
-                <StatCard label="Paid this period" value={String(paid)} sub={`${unpaid} unpaid`} icon={Wallet} tone="azure" />
+                <StatCard label="Total households" value={String(totalHouseholds)} sub={`${puroks.length} puroks`} icon={Home} tone="pine" />
+                <StatCard
+                  label="Paid this period"
+                  value={String(paid)}
+                  sub={newHouseholds > 0 ? `${unpaid} unpaid · ${newHouseholds} new` : `${unpaid} unpaid`}
+                  icon={Wallet}
+                  tone="azure"
+                />
                 <StatCard
                   label="Open violations"
-                  value={String(violations.filter((v) => v.status === "active").length)}
+                  value={String(openViolations)}
                   sub="Currently active"
                   icon={AlertTriangle}
                   tone="clay"
@@ -114,13 +99,16 @@ export default function AdminDashboard() {
                 <Card className="p-5">
                   <p className="text-sm font-semibold text-ink">Paid vs. unpaid households</p>
                   <p className="text-xs text-ink/50">{periodCaption}</p>
-                  <PaidUnpaidPie paid={paid} unpaid={unpaid} />
+                  <PaidUnpaidPie paid={paid} unpaid={unpaid} newCount={newHouseholds} />
                 </Card>
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
                 <Card className="p-5 xl:col-span-2">
-                  <p className="text-sm font-semibold text-ink">Recent trash logs</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-ink">Recent trash logs</p>
+                    <ViewAllLink href="/admin/trash-logs" />
+                  </div>
                   <p className="text-xs text-ink/50">Latest scans recorded during collection</p>
                   <div className="mt-3 divide-y divide-line">
                     {recentLogs.map((log) => (

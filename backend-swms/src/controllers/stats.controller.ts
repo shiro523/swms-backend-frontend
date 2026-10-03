@@ -9,4 +9,12 @@ export const statsController = {
   async paymentCollection(req: Request, res: Response) {
     res.json(await statsService.paymentCollection(req.user!));
   },
+
+  async publicSummary(_req: Request, res: Response) {
+    res.json(await statsService.publicSummary());
+  },
+
+  async adminDashboard(req: Request, res: Response) {
+    res.json(await statsService.adminDashboard(req.user!));
+  },
 };

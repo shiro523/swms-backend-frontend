@@ -6,6 +6,9 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
+  // Loads `include`d relations with one SQL JOIN instead of one extra round
+  // trip per relation — every round trip to the hosted DB costs ~45ms.
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {

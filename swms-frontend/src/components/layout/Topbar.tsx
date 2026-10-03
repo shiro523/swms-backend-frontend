@@ -3,13 +3,14 @@
 import { Bell, LogOut, Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Role } from "@/lib/types";
 import { ROLE_LABEL } from "@/lib/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { MobileNav } from "./MobileNav";
+import { NOTIFICATIONS_READ_EVENT } from "@/components/notifications/NotificationList";
 
 export function Topbar({ role, userName }: { role: Role; userName: string }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -23,6 +24,13 @@ export function Topbar({ role, userName }: { role: Role; userName: string }) {
   // after reading something is enough to keep this in sync, with no polling.
   const unread = useApi(() => api.unreadNotificationCount(), [pathname]);
   const hasUnread = (unread.data?.count ?? 0) > 0;
+
+  // Also refresh as soon as a notification is opened/read on this page.
+  const reloadUnread = unread.reload;
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_READ_EVENT, reloadUnread);
+    return () => window.removeEventListener(NOTIFICATIONS_READ_EVENT, reloadUnread);
+  }, [reloadUnread]);
 
   const displayName = user?.name ?? userName;
 

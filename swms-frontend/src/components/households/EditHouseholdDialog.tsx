@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pencil, Loader2 } from "lucide-react";
 import { Modal, Field, inputClass } from "@/components/ui/Modal";
 import { api } from "@/lib/api";
+import { contactNumberInputProps, toContactNumber } from "@/lib/numericInput";
 import type { Household } from "@/lib/types";
 
 export function EditHouseholdDialog({
@@ -75,7 +76,7 @@ export function EditHouseholdDialog({
             <input className={inputClass} value={representative} onChange={(e) => setRepresentative(e.target.value)} required />
           </Field>
           <Field label="Contact number">
-            <input className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} required />
+            <input {...contactNumberInputProps} className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(toContactNumber(e.target.value))} required />
           </Field>
           <Field label="Address">
             <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} required />

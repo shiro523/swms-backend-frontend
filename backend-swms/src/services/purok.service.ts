@@ -30,7 +30,6 @@ export const purokService = {
   async create(input: {
     name: string;
     leaderName: string;
-    complianceRate: number;
     username: string;
     password: string;
     email: string;
@@ -51,7 +50,6 @@ export const purokService = {
         id,
         name: input.name,
         leaderName: input.leaderName,
-        complianceRate: input.complianceRate,
         user: { username, passwordHash, email },
       });
     } catch (err) {
@@ -86,7 +84,9 @@ export const purokService = {
       await purokRepository.update(purokId, purokData);
     }
 
-    if (input.username || input.email) {
+    // The leader account mirrors leaderName, so a rename is synced even when
+    // username/email are not part of this update.
+    if (input.username || input.email || purokData.leaderName) {
       const leader = await userRepository.findLeaderByPurokId(purokId);
       if (leader) {
         const accountData: { username?: string; email?: string; name?: string } = {};

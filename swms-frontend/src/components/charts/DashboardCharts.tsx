@@ -48,9 +48,18 @@ export function ComplianceTrendChart({ data }: { data: MonthlyCollectionStat[] }
 }
 
 export function PurokComplianceBar({ puroks }: { puroks: Purok[] }) {
+  // Only puroks with collection records have a real rate to chart.
+  const withRecords = puroks.filter((p): p is Purok & { complianceRate: number } => p.complianceRate !== null);
+  if (withRecords.length === 0) {
+    return (
+      <div className="flex h-[230px] items-center justify-center text-sm text-ink/40">
+        No collections recorded yet.
+      </div>
+    );
+  }
   return (
     <ResponsiveContainer width="100%" height={230}>
-      <BarChart data={puroks} margin={{ left: -20, top: 10 }}>
+      <BarChart data={withRecords} margin={{ left: -20, top: 10 }}>
         <CartesianGrid vertical={false} stroke="#d7ddcd" />
         <XAxis
           dataKey="name"
@@ -62,7 +71,7 @@ export function PurokComplianceBar({ puroks }: { puroks: Purok[] }) {
         <YAxis tick={{ fontSize: 11, fill: "#16241c99" }} axisLine={false} tickLine={false} unit="%" />
         <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #d7ddcd", fontSize: 12 }} />
         <Bar dataKey="complianceRate" name="Compliance rate" radius={[6, 6, 0, 0]}>
-          {puroks.map((p) => (
+          {withRecords.map((p) => (
             <Cell key={p.id} fill={p.complianceRate >= 90 ? PINE : p.complianceRate >= 80 ? AZURE : GOLD} />
           ))}
         </Bar>
@@ -71,10 +80,12 @@ export function PurokComplianceBar({ puroks }: { puroks: Purok[] }) {
   );
 }
 
-export function PaidUnpaidPie({ paid, unpaid }: { paid: number; unpaid: number }) {
+export function PaidUnpaidPie({ paid, unpaid, newCount = 0 }: { paid: number; unpaid: number; newCount?: number }) {
   const data = [
     { name: "Paid", value: paid, color: PINE },
     { name: "Unpaid", value: unpaid, color: CLAY },
+    // Registered this month, not paid yet — only shown when there are any.
+    ...(newCount > 0 ? [{ name: "New", value: newCount, color: AZURE }] : []),
   ];
   return (
     <ResponsiveContainer width="100%" height={230}>

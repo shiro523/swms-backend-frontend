@@ -1,12 +1,28 @@
 import { prisma } from "@/lib/prisma";
+import { invalidateAuthCache } from "@/lib/authCache";
 
 const HOUSEHOLD_INCLUDE = {
   purok: true,
   members: { orderBy: { id: "asc" as const } },
   users: { where: { role: "resident" as const }, take: 1 },
+  // Whether any collection has been logged yet — until then complianceRate
+  // is only a placeholder, not a real figure.
+  _count: { select: { trashLogs: true } },
 };
 
 export const householdRepository = {
+  // IDs of the households (matching `householdWhere`) with at least one
+  // payment for `period`. Case-insensitive, like the frontend's
+  // splitHouseholdsByCurrentPeriod; any number of payments per period.
+  async householdIdsPaidForPeriod(householdWhere: Record<string, unknown>, period: string) {
+    const rows = await prisma.payment.findMany({
+      where: { household: householdWhere, period: { equals: period.trim(), mode: "insensitive" } },
+      select: { householdId: true },
+      distinct: ["householdId"],
+    });
+    return new Set(rows.map((r) => r.householdId));
+  },
+
   findMany(where: Record<string, unknown>) {
     return prisma.household.findMany({
       where,
@@ -108,16 +124,22 @@ export const householdRepository = {
   // Soft-removal only — mirrors purokRepository's archive()/restore() exact
   // pattern. Never touches FamilyMember/TrashLog/Violation/Payment; all
   // historical records stay exactly as they were.
-  remove(id: string, data: { removedAt: Date; removalReason: string; removedByName: string }) {
-    return prisma.household.update({ where: { id }, data, include: HOUSEHOLD_INCLUDE });
+  // Each of these three invalidates the auth cache: a resident's access
+  // depends on their household's removed state (see authRequired()).
+  async remove(id: string, data: { removedAt: Date; removalReason: string; removedByName: string }) {
+    const row = await prisma.household.update({ where: { id }, data, include: HOUSEHOLD_INCLUDE });
+    invalidateAuthCache();
+    return row;
   },
 
-  restore(id: string) {
-    return prisma.household.update({
+  async restore(id: string) {
+    const row = await prisma.household.update({
       where: { id },
       data: { removedAt: null, removalReason: null, removedByName: null },
       include: HOUSEHOLD_INCLUDE,
     });
+    invalidateAuthCache();
+    return row;
   },
 
   // Only ever called after householdService's removed-state check passes.
@@ -133,10 +155,12 @@ export const householdRepository = {
   // NotificationReads) are all onDelete: Cascade on householdId/
   // targetHouseholdId. Nothing else references a household, so nothing
   // else needs to be touched here.
-  deleteWithResident(id: string) {
-    return prisma.$transaction([
+  async deleteWithResident(id: string) {
+    const result = await prisma.$transaction([
       prisma.user.deleteMany({ where: { householdId: id, role: "resident" } }),
       prisma.household.delete({ where: { id } }),
     ]);
+    invalidateAuthCache();
+    return result;
   },
 };

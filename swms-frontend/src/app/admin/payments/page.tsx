@@ -8,12 +8,23 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { sortPeriodsNewestFirst, splitHouseholdsByCurrentPeriod } from "@/lib/paymentPeriod";
+import {
+  ALL,
+  UNRECOGNIZED_YEAR,
+  matchesYearMonth,
+  parsePeriod,
+  periodYearOptions,
+} from "@/lib/paymentPeriod";
+import { householdsAwaitingPayment } from "@/lib/householdStatus";
+import { YearMonthFilter } from "@/components/payments/YearMonthFilter";
+import { YearPaymentSummary } from "@/components/payments/YearPaymentSummary";
 import { CorrectPaymentPeriodDialog } from "@/components/payments/CorrectPaymentPeriodDialog";
 import { Payment, PaymentStatus } from "@/lib/types";
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
-function buildColumns(onCorrected: () => void): Column<Payment>[] {
+// newHouseholdIds: placeholder Unpaid-tab rows for households registered
+// this month show "new" instead of "unpaid".
+function buildColumns(onCorrected: () => void, newHouseholdIds: Set<string>): Column<Payment>[] {
   return [
     { header: "Household", accessor: (p) => (
         <span className="font-medium text-ink">{p.representative} <span className="stamp text-[10px] text-ink/40">{p.householdCode}</span></span>
@@ -22,7 +33,12 @@ function buildColumns(onCorrected: () => void): Column<Payment>[] {
     { header: "Period", accessor: (p) => p.period },
     { header: "Amount", accessor: (p) => (p.status === "unpaid" ? "—" : `₱${p.amount.toFixed(2)}`) },
     { header: "Date paid", accessor: (p) => p.datePaid ?? "—" },
-    { header: "Status", accessor: (p) => <StatusBadge status={p.status} /> },
+    {
+      header: "Status",
+      accessor: (p) => (
+        <StatusBadge status={p.status === "unpaid" && newHouseholdIds.has(p.householdId) ? "new" : p.status} />
+      ),
+    },
     {
       header: "Actions",
       // Synthetic "Unpaid" placeholder rows (id starts with "unpaid-") have
@@ -42,7 +58,11 @@ const FILTERS: { label: string; value: PaymentStatus | "all" }[] = [
 export default function PaymentsPage() {
   const [filter, setFilter] = useState<PaymentStatus | "all">("all");
   const [purokFilter, setPurokFilter] = useState("all");
-  const [periodFilter, setPeriodFilter] = useState("all");
+  // Year defaults to the current period's year (null = not chosen yet);
+  // month to all twelve. Replaces the single period dropdown, which grew by
+  // 12 entries every year.
+  const [yearFilter, setYearFilter] = useState<string | null>(null);
+  const [monthFilter, setMonthFilter] = useState(ALL);
   const query = useApi(
     () =>
       Promise.all([api.households(), api.payments(), api.currentPaymentPeriod(), api.puroks()]).then(
@@ -71,20 +91,12 @@ export default function PaymentsPage() {
   const payments =
     purokFilter === "all" ? allPayments : allPayments.filter((p) => householdIdsInScope.has(p.householdId));
 
-  // Options are derived from the real payment records on screen, never a
-  // fixed list — a period appears here only once a Payment row actually
-  // exists for it, and automatically includes any future period (November
-  // 2026, December 2026, ...) the moment the first payment for it is
-  // recorded, with no code change. Newest first, by real date.
-  const periodOptions = sortPeriodsNewestFirst(allPayments.map((p) => p.period));
-
-  // If the selected period stops existing (e.g. its only payment was just
-  // moved to another period via Correct Period), fall back to "all" instead
-  // of leaving the table empty under a dropdown value that's no longer an
-  // option.
-  if (periodFilter !== "all" && query.data && !periodOptions.includes(periodFilter)) {
-    setPeriodFilter("all");
-  }
+  // Years come from the real payment records (plus the current year), so a
+  // new year appears automatically once its first payment is recorded.
+  const yearOptions = periodYearOptions(allPayments.map((p) => p.period), currentPeriod);
+  const currentYear = parsePeriod(currentPeriod)?.year;
+  const selectedYear = yearFilter ?? (currentYear !== undefined ? String(currentYear) : ALL);
+  const summaryYear = selectedYear !== ALL && selectedYear !== UNRECOGNIZED_YEAR ? Number(selectedYear) : null;
 
   // Paid/unpaid for the current billing period, derived from actual Payment
   // records — never from Payment.status (always "paid", not period-aware)
@@ -92,11 +104,16 @@ export default function PaymentsPage() {
   // Scoped to the purok filter (not the period filter — Paid/Unpaid is
   // always about the current period, independent of which period the table
   // below is being browsed for).
-  const { paidHouseholdIds, paidHouseholds, unpaidHouseholds } = splitHouseholdsByCurrentPeriod(
-    households,
-    payments,
-    currentPeriod,
-  );
+  // Uses the server's periodPaymentStatus (paid / unpaid / new) — the same
+  // status the households lists and the purok leader pages show. "new" =
+  // registered this month, not paid yet: listed under Unpaid (a payment can
+  // be recorded for it) but counted separately.
+  const unpaidHouseholds = householdsAwaitingPayment(households);
+  const paidHouseholds = households.filter((h) => h.periodPaymentStatus === "paid");
+  const paidHouseholdIds = new Set(paidHouseholds.map((h) => h.id));
+  const unpaidCount = unpaidHouseholds.filter((h) => h.periodPaymentStatus === "unpaid").length;
+  const newCount = unpaidHouseholds.length - unpaidCount;
+  const newHouseholdIds = new Set(unpaidHouseholds.filter((h) => h.periodPaymentStatus === "new").map((h) => h.id));
 
   // The Unpaid tab can't show a real Payment row — by definition, an unpaid
   // household has no payment record for the current period, so the only
@@ -119,12 +136,11 @@ export default function PaymentsPage() {
     status: "unpaid",
   }));
 
-  // The period filter only applies to real payment rows (All/Paid) — the
-  // Unpaid tab's synthetic rows have one fixed meaning ("no payment for the
-  // current period yet") that a past-period filter can't meaningfully
+  // The year/month filter only applies to real payment rows (All/Paid) —
+  // the Unpaid tab's synthetic rows have one fixed meaning ("no payment for
+  // the current period yet") that a past-period filter can't meaningfully
   // narrow, so it's left untouched there.
-  const periodScoped = (rows: Payment[]) =>
-    periodFilter === "all" ? rows : rows.filter((p) => p.period === periodFilter);
+  const periodScoped = (rows: Payment[]) => rows.filter((p) => matchesYearMonth(p.period, selectedYear, monthFilter));
 
   const filtered =
     filter === "all"
@@ -148,7 +164,13 @@ export default function PaymentsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Collected (all time)" value={`₱${collected.toLocaleString()}`} sub={`${paidHouseholds.length} households paid this period`} icon={Wallet} tone="pine" />
         <StatCard label="Paid this period" value={String(paidHouseholds.length)} icon={CircleCheck} tone="pine" />
-        <StatCard label="Unpaid this period" value={String(unpaidHouseholds.length)} icon={CircleX} tone="clay" />
+        <StatCard
+          label="Unpaid this period"
+          value={String(unpaidCount)}
+          sub={newCount > 0 ? `+ ${newCount} new (registered this month)` : undefined}
+          icon={CircleX}
+          tone="clay"
+        />
       </div>
 
       <div className="my-4 flex flex-wrap items-center gap-2">
@@ -177,23 +199,32 @@ export default function PaymentsPage() {
           ))}
         </select>
 
-        <select
-          value={periodFilter}
-          onChange={(e) => setPeriodFilter(e.target.value)}
-          className="rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink/70"
-        >
-          <option value="all">All periods</option>
-          {periodOptions.map((period) => (
-            <option key={period} value={period}>{period}</option>
-          ))}
-        </select>
+        <YearMonthFilter
+          years={yearOptions}
+          year={selectedYear}
+          month={monthFilter}
+          onYearChange={setYearFilter}
+          onMonthChange={setMonthFilter}
+        />
       </div>
+
+      {summaryYear !== null && filter !== "unpaid" && (
+        <div className="mb-4">
+          <YearPaymentSummary
+            payments={payments}
+            year={summaryYear}
+            currentPeriod={currentPeriod}
+            selectedMonth={monthFilter}
+            onSelectMonth={setMonthFilter}
+          />
+        </div>
+      )}
 
       <AsyncSection query={query}>
         {() => (
           <DataTable
             data={filtered}
-            columns={buildColumns(() => query.reload())}
+            columns={buildColumns(() => query.reload(), newHouseholdIds)}
             searchPlaceholder="Search by household name, code, or ID…"
             searchKeys={(p) => `${p.representative} ${p.householdCode} ${p.householdId}`}
             pageSize={10}

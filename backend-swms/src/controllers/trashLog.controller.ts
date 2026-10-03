@@ -12,6 +12,10 @@ export const trashLogController = {
     res.status(201).json(log);
   },
 
+  async currentCollectionWeek(_req: Request, res: Response) {
+    res.json(await trashLogService.currentCollectionWeek());
+  },
+
   async getById(req: Request, res: Response) {
     res.json(await trashLogService.getById(req.user!, String(req.params.id)));
   },

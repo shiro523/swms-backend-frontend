@@ -49,8 +49,16 @@ async function notificationVisibilityWhere(user: AuthContext): Promise<Record<st
       const barangayWide = { targetPurokId: null, targetHouseholdId: null };
       const or: Record<string, unknown>[] = [barangayWide];
       if (user.householdId) or.push({ targetHouseholdId: user.householdId });
-      const purokId = await residentPurokId(user);
-      if (purokId) or.push({ targetPurokId: purokId, targetHouseholdId: null, leaderOnly: false });
+      // Purok-wide notices for the purok the resident's household is in
+      // right now — matched in the same query via the relation instead of a
+      // separate household lookup first (one fewer DB round trip).
+      if (user.householdId) {
+        or.push({
+          targetPurok: { households: { some: { id: user.householdId } } },
+          targetHouseholdId: null,
+          leaderOnly: false,
+        });
+      }
       return { OR: or };
     }
     default:

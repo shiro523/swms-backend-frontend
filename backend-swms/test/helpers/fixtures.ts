@@ -40,7 +40,6 @@ export async function createTestPurok(runId: string = newTestRunId()): Promise<T
     id: purokId,
     name: `Test Purok ${runId}`,
     leaderName: "Test Leader",
-    complianceRate: 100,
     user: {
       username: leaderUsername,
       passwordHash: await hashTestPassword(),
@@ -70,7 +69,7 @@ export async function createTestHousehold(
     representative: `Test Representative ${seq}`,
     address: "123 Test Street",
     purokId: purok.purokId,
-    contactNumber: "0900-000-0000",
+    contactNumber: "09000000000",
     registeredAt: new Date(),
     members: [],
     user: {

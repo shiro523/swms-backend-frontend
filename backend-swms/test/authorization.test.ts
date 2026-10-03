@@ -83,7 +83,7 @@ describe("authorization", () => {
       const newHouseholdBody = {
         representative: "Authz Test Rep",
         address: "1 Authz Street",
-        contactNumber: "0900-000-0001",
+        contactNumber: "09000000001",
         members: [],
         username: `test-${purok.runId}-newresident`,
         password: TEST_PASSWORD,

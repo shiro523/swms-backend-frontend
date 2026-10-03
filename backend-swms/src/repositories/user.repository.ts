@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { invalidateAuthCache } from "@/lib/authCache";
 
 export const userRepository = {
   findByUsername(username: string) {
@@ -37,8 +38,8 @@ export const userRepository = {
   // Bumps tokenVersion in the same atomic update as the password change —
   // any JWT issued before this moment fails authRequired()'s version check
   // on its very next request, regardless of its expiry.
-  updatePasswordAndClearReset(id: number, passwordHash: string) {
-    return prisma.user.update({
+  async updatePasswordAndClearReset(id: number, passwordHash: string) {
+    const row = await prisma.user.update({
       where: { id },
       data: {
         passwordHash,
@@ -47,16 +48,20 @@ export const userRepository = {
         tokenVersion: { increment: 1 },
       },
     });
+    invalidateAuthCache(id);
+    return row;
   },
 
   // Same tokenVersion-bump idiom as above, but on its own — logout (Batch J)
   // only ever needs to invalidate existing sessions, never touches
   // passwordHash/resetToken fields the way a password reset does.
-  incrementTokenVersion(id: number) {
-    return prisma.user.update({
+  async incrementTokenVersion(id: number) {
+    const row = await prisma.user.update({
       where: { id },
       data: { tokenVersion: { increment: 1 } },
     });
+    invalidateAuthCache(id);
+    return row;
   },
 
   findLeaderByPurokId(purokId: string) {
@@ -75,7 +80,10 @@ export const userRepository = {
     return prisma.user.findFirst({ where: { role: "resident", householdId } });
   },
 
-  updateAccount(id: number, data: { username?: string; email?: string; name?: string }) {
-    return prisma.user.update({ where: { id }, data });
+  async updateAccount(id: number, data: { username?: string; email?: string; name?: string }) {
+    const row = await prisma.user.update({ where: { id }, data });
+    // The auth cache holds the display name (see authRequired()).
+    invalidateAuthCache(id);
+    return row;
   },
 };

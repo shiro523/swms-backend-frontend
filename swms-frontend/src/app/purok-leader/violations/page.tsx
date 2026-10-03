@@ -81,7 +81,7 @@ export default function PurokLeaderViolationsPage() {
       <PageHeader
         eyebrow={query.data?.purok?.name ?? "Your purok"}
         title="Violations"
-        description="Improper segregation, missed collections, and repeat offenses in your purok."
+        description="Improper segregation and repeat offenses in your purok. Missed collections are tracked in Trash logs."
         actions={
           violations.length > 0 && (
             <ExportButton filename="my-violations" rows={violations} format="xlsx" columns={xlsxColumns} />

@@ -102,7 +102,7 @@ export default function HouseholdDetailPage() {
               description={`House representative for ${household.purokName}`}
               actions={
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={household.paymentStatus} />
+                  <StatusBadge status={household.periodPaymentStatus} />
                   {household.removedAt ? (
                     <>
                       {canRestore && (
@@ -198,7 +198,7 @@ export default function HouseholdDetailPage() {
               <Card className="p-5 xl:col-span-2">
                 <p className="text-sm font-semibold text-ink">Waste monitoring</p>
                 <p className="text-xs text-ink/50">Summary derived from this household&apos;s own trash collection logs</p>
-                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
                   <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                     <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Total logs</p>
                     <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.total}</p>
@@ -210,6 +210,10 @@ export default function HouseholdDetailPage() {
                   <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                     <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Violations</p>
                     <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.violations}</p>
+                  </div>
+                  <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
+                    <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Missed</p>
+                    <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.missed}</p>
                   </div>
                   <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                     <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Most recent</p>

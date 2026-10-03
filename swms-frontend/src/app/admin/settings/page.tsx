@@ -6,7 +6,23 @@ import { PageHeader, Card } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { useApi } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { contactNumberInputProps, toContactNumber, moneyInputProps, toMoney } from "@/lib/numericInput";
 import type { SystemSettings } from "@/lib/types";
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// The saved value is free text from before this was a dropdown; pick the
+// first weekday it names (same rule the backend's weekly schedule uses),
+// defaulting to Sunday.
+function initialCollectionDay(saved: string): string {
+  const text = saved.toLowerCase();
+  let best = { index: Infinity, day: "Sunday" };
+  for (const day of WEEKDAYS) {
+    const index = text.search(new RegExp(`\\b${day.slice(0, 3).toLowerCase()}`));
+    if (index !== -1 && index < best.index) best = { index, day };
+  }
+  return best.day;
+}
 
 const inputClass =
   "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-pine";
@@ -16,7 +32,7 @@ function SettingsForm({ settings, onSaved }: { settings: SystemSettings; onSaved
   const [municipality, setMunicipality] = useState(settings.municipality);
   const [contactNumber, setContactNumber] = useState(settings.contactNumber);
   const [monthlyCollectionFee, setMonthlyCollectionFee] = useState(String(settings.monthlyCollectionFee));
-  const [collectionDays, setCollectionDays] = useState(settings.collectionDays);
+  const [collectionDays, setCollectionDays] = useState(() => initialCollectionDay(settings.collectionDays));
   const [collectionTime, setCollectionTime] = useState(settings.collectionTime);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -58,7 +74,7 @@ function SettingsForm({ settings, onSaved }: { settings: SystemSettings; onSaved
           </label>
           <label className="block">
             <span className="text-xs font-medium text-ink/50">Contact number</span>
-            <input className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} maxLength={40} />
+            <input {...contactNumberInputProps} className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(toContactNumber(e.target.value))} />
           </label>
         </div>
       </Card>
@@ -69,23 +85,21 @@ function SettingsForm({ settings, onSaved }: { settings: SystemSettings; onSaved
           <label className="block">
             <span className="text-xs font-medium text-ink/50">Monthly collection fee (₱)</span>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              {...moneyInputProps}
               className={inputClass}
               value={monthlyCollectionFee}
-              onChange={(e) => setMonthlyCollectionFee(e.target.value)}
+              onChange={(e) => setMonthlyCollectionFee(toMoney(e.target.value))}
             />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-ink/50">Collection days</span>
-            <input
-              className={inputClass}
-              value={collectionDays}
-              onChange={(e) => setCollectionDays(e.target.value)}
-              placeholder="e.g. Monday, Thursday"
-              maxLength={120}
-            />
+            <span className="text-xs font-medium text-ink/50">Collection day (weekly)</span>
+            {/* One day a week: it starts each collection week, decides when
+                missed collections are recorded, and is shown to residents. */}
+            <select className={inputClass} value={collectionDays} onChange={(e) => setCollectionDays(e.target.value)}>
+              {WEEKDAYS.map((day) => (
+                <option key={day} value={day}>{day}</option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="text-xs font-medium text-ink/50">Default collection time</span>

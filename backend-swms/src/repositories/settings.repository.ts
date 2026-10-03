@@ -7,7 +7,12 @@ export const settingsRepository = {
   // empty create payload (all columns have schema defaults) is the safe way
   // to "get, creating the default row on first access" without ever risking
   // a second row.
-  get() {
+  // Plain read first: an upsert always runs as a multi-statement
+  // transaction (several DB round trips) even when the row already exists,
+  // which it does on every call after the very first.
+  async get() {
+    const row = await prisma.systemSettings.findUnique({ where: { id: SETTINGS_ID } });
+    if (row) return row;
     return prisma.systemSettings.upsert({
       where: { id: SETTINGS_ID },
       create: { id: SETTINGS_ID },

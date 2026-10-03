@@ -7,10 +7,12 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProfileEditor } from "./ProfileEditor";
 import { EditPersonalInfoDialog } from "./EditPersonalInfoDialog";
 import { useApi } from "@/hooks/useApi";
+import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { summarizeTrashLogs } from "@/lib/wasteMonitoring";
 
 export default function ResidentProfilePage() {
+  const { refresh: refreshSession } = useAuth();
   const query = useApi(
     () =>
       Promise.all([
@@ -58,7 +60,15 @@ export default function ResidentProfilePage() {
               <Card className="p-5">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold text-ink">Personal information</p>
-                  <EditPersonalInfoDialog household={household} onUpdated={() => query.reload()} />
+                  <EditPersonalInfoDialog
+                    household={household}
+                    onUpdated={() => {
+                      query.reload();
+                      // The top bar shows the account name, which follows the
+                      // representative name.
+                      void refreshSession();
+                    }}
+                  />
                 </div>
                 <div className="mt-3 space-y-2.5 text-sm text-ink/70">
                   <p className="flex items-center gap-2"><Mail size={14} className="text-ink/40" /> {household.username ? `@${household.username}` : "No account"} {household.email ? `· ${household.email}` : ""}</p>
@@ -113,7 +123,7 @@ export default function ResidentProfilePage() {
             <Card className="mt-4 p-5">
               <p className="text-sm font-semibold text-ink">Waste monitoring</p>
               <p className="text-xs text-ink/50">Summary derived from your household&apos;s own trash collection logs</p>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-5">
                 <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                   <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Total logs</p>
                   <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.total}</p>
@@ -125,6 +135,10 @@ export default function ResidentProfilePage() {
                 <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                   <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Violations</p>
                   <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.violations}</p>
+                </div>
+                <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
+                  <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Missed</p>
+                  <p className="mt-1 font-[family-name:var(--font-display)] text-lg font-semibold text-ink">{waste.missed}</p>
                 </div>
                 <div className="rounded-xl border border-line bg-panel px-3 py-2.5">
                   <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Most recent</p>

@@ -144,21 +144,22 @@ describe("violation lifecycle", () => {
       expect(violation1.isRepeat).toBe(false);
       const today = violation1.vDate;
 
-      // TrashLog creation is limited to one per household per calendar date
-      // — the real API has no client-supplied date, so there is no way to
-      // create a second same-day violation for this household through it.
+      // TrashLog creation is limited to one per household per collection
+      // week — the real API has no client-supplied date, so there is no way
+      // to create a second same-week violation for this household through it.
       // This directly shifts the date on the just-created row (the exact
       // technique already used, and approved, for this same scenario during
       // earlier manual testing of the repeat-offense rule) to free "today"
-      // back up, rather than fabricating a second violation directly.
-      const yesterday = addDays(today, -1);
+      // back up, rather than fabricating a second violation directly. Shifted by
+      // a whole week so it lands in the previous collection week.
+      const lastWeek = addDays(today, -7);
       await prisma.trashLog.updateMany({
         where: { householdId: household.householdId, logDate: today },
-        data: { logDate: yesterday },
+        data: { logDate: lastWeek },
       });
       await prisma.violation.updateMany({
         where: { householdId: household.householdId, vDate: today },
-        data: { vDate: yesterday },
+        data: { vDate: lastWeek },
       });
 
       // Violation 2 (today, now free again) — a genuine second offense.
@@ -177,15 +178,15 @@ describe("violation lifecycle", () => {
       const completeRes = await adminAgent.patch(`/api/violations/${violation1.id}/complete`);
       expect(completeRes.status).toBe(200);
 
-      // Free "today" up again by moving violation 2 back two days.
-      const twoDaysAgo = addDays(today, -2);
+      // Free this week up again by moving violation 2 back two weeks.
+      const twoWeeksAgo = addDays(today, -14);
       await prisma.trashLog.updateMany({
         where: { householdId: household.householdId, logDate: today },
-        data: { logDate: twoDaysAgo },
+        data: { logDate: twoWeeksAgo },
       });
       await prisma.violation.updateMany({
         where: { householdId: household.householdId, vDate: today },
-        data: { vDate: twoDaysAgo },
+        data: { vDate: twoWeeksAgo },
       });
 
       // Violation 3 (today) — the household now has one completed and one

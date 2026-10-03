@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Plus, CalendarDays, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/Primitives";
 import { Modal, Field } from "@/components/ui/Modal";
 import { api } from "@/lib/api";
+import { ageInputProps, toAge } from "@/lib/numericInput";
 import type { Household, FamilyMember } from "@/lib/types";
 
 export function ProfileEditor({
@@ -14,12 +15,6 @@ export function ProfileEditor({
   household: Household;
   onChanged: () => void;
 }) {
-  const [representative, setRepresentative] = useState(household.representative);
-  const [contactNumber, setContactNumber] = useState(household.contactNumber);
-  const [address, setAddress] = useState(household.address);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
   const [showAdd, setShowAdd] = useState(false);
   const [mName, setMName] = useState("");
   const [mRelation, setMRelation] = useState("");
@@ -40,20 +35,6 @@ export function ProfileEditor({
 
   const inputClass =
     "mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-pine";
-
-  const saveProfile = async () => {
-    setSavingProfile(true);
-    setProfileMsg(null);
-    try {
-      await api.updateHousehold(household.id, { representative, contactNumber, address });
-      setProfileMsg({ ok: true, text: "Saved." });
-      onChanged();
-    } catch (err) {
-      setProfileMsg({ ok: false, text: err instanceof Error ? err.message : "Save failed." });
-    } finally {
-      setSavingProfile(false);
-    }
-  };
 
   const addMember = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,40 +102,7 @@ export function ProfileEditor({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      <Card className="p-5">
-        <p className="text-sm font-semibold text-ink">House representative</p>
-        <div className="mt-3 space-y-3">
-          <label className="block">
-            <span className="text-xs font-medium text-ink/50">Full name</span>
-            <input value={representative} onChange={(e) => setRepresentative(e.target.value)} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-ink/50">Contact number</span>
-            <input value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} className={inputClass} />
-          </label>
-          <label className="block">
-            <span className="text-xs font-medium text-ink/50">Address</span>
-            <input value={address} onChange={(e) => setAddress(e.target.value)} className={inputClass} />
-          </label>
-          <p className="flex items-center gap-2 text-xs text-ink/50">
-            <CalendarDays size={13} className="text-ink/40" /> Registered {household.registeredAt}
-          </p>
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            onClick={saveProfile}
-            disabled={savingProfile}
-            className="flex items-center gap-2 rounded-lg bg-pine px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-pine-dark disabled:opacity-50"
-          >
-            {savingProfile ? <><Loader2 size={14} className="animate-spin" /> Saving…</> : "Save changes"}
-          </button>
-          {profileMsg && (
-            <span className={`text-xs ${profileMsg.ok ? "text-pine-dark" : "text-clay"}`}>{profileMsg.text}</span>
-          )}
-        </div>
-      </Card>
-
+    <div>
       <Card className="p-5">
         <p className="text-sm font-semibold text-ink">Family members</p>
         <div className="mt-3 divide-y divide-line">
@@ -190,7 +138,7 @@ export function ProfileEditor({
             <input placeholder="Name" value={mName} onChange={(e) => setMName(e.target.value)} required className={inputClass} />
             <div className="flex gap-2">
               <input placeholder="Relation" value={mRelation} onChange={(e) => setMRelation(e.target.value)} className={inputClass} />
-              <input placeholder="Age" type="number" min="0" value={mAge} onChange={(e) => setMAge(e.target.value)} required className={`${inputClass} w-24`} />
+              <input placeholder="Age" {...ageInputProps} value={mAge} onChange={(e) => setMAge(toAge(e.target.value))} required className={`${inputClass} w-24`} />
             </div>
             {memberErr && <p className="text-xs text-clay">{memberErr}</p>}
             <div className="flex justify-end gap-2">
@@ -227,7 +175,7 @@ export function ProfileEditor({
               <input className={inputClass} value={eRelation} onChange={(e) => setERelation(e.target.value)} />
             </Field>
             <Field label="Age">
-              <input type="number" min="0" className={inputClass} value={eAge} onChange={(e) => setEAge(e.target.value)} required />
+              <input {...ageInputProps} className={inputClass} value={eAge} onChange={(e) => setEAge(toAge(e.target.value))} required />
             </Field>
           </div>
           {editError && <p className="rounded-lg border border-clay/30 bg-clay-tint px-3 py-2 text-xs text-clay">{editError}</p>}

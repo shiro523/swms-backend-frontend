@@ -60,7 +60,7 @@ export default function ViolationsPage() {
       <PageHeader
         eyebrow={`${violations.length} recorded`}
         title="Violations"
-        description="Improper segregation, missed collections, and repeat offenses."
+        description="Improper segregation and repeat offenses. Missed collections are tracked in Trash logs."
         actions={<ExportButton filename="violations" rows={violations} />}
       />
 
