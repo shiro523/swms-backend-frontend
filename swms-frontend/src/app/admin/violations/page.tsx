@@ -7,7 +7,7 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { ViolationStatusBadge } from "@/components/violations/ViolationStatusBadge";
-import { CompleteViolationButton } from "@/components/violations/CompleteViolationButton";
+import { ViolationLimitCard } from "@/components/violations/ViolationLimitCard";
 import { formatResolvedDate } from "@/lib/violation";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
@@ -17,8 +17,11 @@ type Filter = "all" | "active" | "completed";
 
 export default function ViolationsPage() {
   const [filter, setFilter] = useState<Filter>("active");
-  const query = useApi(() => api.violations(), []);
-  const violations = query.data ?? [];
+  const query = useApi(
+    () => Promise.all([api.violations(), api.violationsAtLimit()]).then(([violations, atLimit]) => ({ violations, atLimit })),
+    [],
+  );
+  const violations = query.data?.violations ?? [];
   const filtered = filter === "all" ? violations : violations.filter((v) => v.status === filter);
 
   const columns: Column<Violation>[] = [
@@ -44,15 +47,6 @@ export default function ViolationsPage() {
           <ViolationStatusBadge status="active" />
         ),
     },
-    {
-      header: "Action",
-      accessor: (v) =>
-        v.status === "active" ? (
-          <CompleteViolationButton violation={v} onCompleted={() => query.reload()} />
-        ) : (
-          <span className="text-ink/30">—</span>
-        ),
-    },
   ];
 
   return (
@@ -63,6 +57,14 @@ export default function ViolationsPage() {
         description="Improper segregation and repeat offenses. Missed collections are tracked in Trash logs."
         actions={<ExportButton filename="violations" rows={violations} />}
       />
+
+      {query.data && (
+        <ViolationLimitCard data={query.data.atLimit} canNotify onSent={() => query.reload()} />
+      )}
+
+      <p className="mb-3 text-xs text-ink/45">
+        Purok leaders mark violations completed once the resident has complied.
+      </p>
 
       <div className="mb-4 flex gap-2">
         {(

@@ -50,9 +50,21 @@ export function CompleteViolationButton({ violation, onCompleted }: { violation:
           setConfirming(false);
         }}
         title="Mark this violation as completed?"
-        description="This records that the household has already addressed the violation and closes the record. It cannot be undone, and the violation stays in history."
+        description="The user complied and settled his/her violation."
       >
         <div className="space-y-3">
+          <div className="rounded-xl border border-line bg-panel/50 px-4 py-3 text-sm text-ink/70">
+            <p className="font-medium text-ink">
+              {violation.representative} <span className="stamp text-[10px] text-ink/40">{violation.householdCode}</span>
+            </p>
+            <p className="mt-0.5">
+              {violation.type} · {violation.date}
+            </p>
+          </div>
+          <p className="text-xs leading-relaxed text-ink/50">
+            This closes the violation and can&apos;t be undone. It stays in the household&apos;s history and still counts
+            toward the 5-violation limit.
+          </p>
           {error && <p className="rounded-lg border border-clay/30 bg-clay-tint px-3 py-2 text-xs text-clay">{error}</p>}
           <div className="flex justify-end gap-2">
             <button

@@ -11,8 +11,10 @@ import { api } from "@/lib/api";
 import {
   ALL,
   UNRECOGNIZED_YEAR,
+  describeYearMonth,
   matchesYearMonth,
   parsePeriod,
+  toFileSlug,
   periodYearOptions,
 } from "@/lib/paymentPeriod";
 import { householdsAwaitingPayment } from "@/lib/householdStatus";
@@ -20,6 +22,17 @@ import { YearMonthFilter } from "@/components/payments/YearMonthFilter";
 import { YearPaymentSummary } from "@/components/payments/YearPaymentSummary";
 import { CorrectPaymentPeriodDialog } from "@/components/payments/CorrectPaymentPeriodDialog";
 import { Payment, PaymentStatus } from "@/lib/types";
+import type { XlsxColumn } from "@/lib/exportXlsx";
+
+const xlsxColumns: XlsxColumn<Payment>[] = [
+  { header: "Household", accessor: (p) => p.representative },
+  { header: "Household Code", accessor: (p) => p.householdCode },
+  { header: "Purok", accessor: (p) => p.purokName },
+  { header: "Period", accessor: (p) => p.period },
+  { header: "Amount", accessor: (p) => (p.status === "unpaid" ? "" : p.amount), numFmt: '"₱"#,##0.00' },
+  { header: "Date Paid", accessor: (p) => p.datePaid ?? "" },
+  { header: "Status", accessor: (p) => p.status },
+];
 import { Wallet, CircleCheck, CircleX } from "lucide-react";
 
 // newHouseholdIds: placeholder Unpaid-tab rows for households registered
@@ -152,20 +165,49 @@ export default function PaymentsPage() {
   const collected = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
   const periodEyebrow = currentPeriod ? `${currentPeriod} collection` : "Collection";
 
+  // What the table (and the export) currently shows. The Unpaid tab is
+  // always the current period, so the year/month filter doesn't apply to it.
+  const selectionLabel =
+    filter === "unpaid" ? `Unpaid · ${currentPeriod}` : describeYearMonth(selectedYear, monthFilter);
+  const collectedInSelection = periodScoped(payments)
+    .filter((p) => p.status === "paid")
+    .reduce((sum, p) => sum + p.amount, 0);
+  // e.g. payments-november-2026, payments-paid-2026, payments-unpaid-october-2026
+  const selectionSlug = toFileSlug(describeYearMonth(selectedYear, monthFilter)).replace(/^payments-/, "");
+  const exportName =
+    filter === "unpaid"
+      ? `payments-unpaid-${toFileSlug(currentPeriod)}`
+      : `payments-${filter === "paid" ? "paid-" : ""}${selectionSlug}`;
+
   return (
     <div>
       <PageHeader
         eyebrow={periodEyebrow}
         title="Payments"
         description="Monthly waste collection fee status across all households."
-        actions={<ExportButton filename="payments" rows={filtered} />}
+        actions={
+          <ExportButton
+            filename={exportName}
+            rows={filtered}
+            format="xlsx"
+            columns={xlsxColumns}
+            disabled={filtered.length === 0}
+            disabledReason={`No records for ${selectionLabel} to export.`}
+          />
+        }
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Collected (all time)" value={`₱${collected.toLocaleString()}`} sub={`${paidHouseholds.length} households paid this period`} icon={Wallet} tone="pine" />
-        <StatCard label="Paid this period" value={String(paidHouseholds.length)} icon={CircleCheck} tone="pine" />
         <StatCard
-          label="Unpaid this period"
+          label={`Collected · ${describeYearMonth(selectedYear, monthFilter)}`}
+          value={`₱${collectedInSelection.toLocaleString()}`}
+          sub={`₱${collected.toLocaleString()} collected all time`}
+          icon={Wallet}
+          tone="pine"
+        />
+        <StatCard label={`Paid · ${currentPeriod || "this period"}`} value={String(paidHouseholds.length)} icon={CircleCheck} tone="pine" />
+        <StatCard
+          label={`Unpaid · ${currentPeriod || "this period"}`}
           value={String(unpaidCount)}
           sub={newCount > 0 ? `+ ${newCount} new (registered this month)` : undefined}
           icon={CircleX}
@@ -205,7 +247,11 @@ export default function PaymentsPage() {
           month={monthFilter}
           onYearChange={setYearFilter}
           onMonthChange={setMonthFilter}
+          disabled={filter === "unpaid"}
         />
+        {filter === "unpaid" && (
+          <span className="text-xs text-ink/45">The Unpaid tab always shows the current period ({currentPeriod}).</span>
+        )}
       </div>
 
       {summaryYear !== null && filter !== "unpaid" && (
@@ -220,10 +266,16 @@ export default function PaymentsPage() {
         </div>
       )}
 
+      <p className="mb-2 text-xs text-ink/50">
+        Showing <span className="font-semibold text-ink/70">{filtered.length}</span>{" "}
+        {filter === "unpaid" ? "unpaid household" : "payment"}{filtered.length === 1 ? "" : "s"} · {selectionLabel}
+      </p>
+
       <AsyncSection query={query}>
         {() => (
           <DataTable
             data={filtered}
+            emptyMessage={filter === "unpaid" ? `Every household has paid for ${currentPeriod}.` : `No payments for ${selectionLabel}.`}
             columns={buildColumns(() => query.reload(), newHouseholdIds)}
             searchPlaceholder="Search by household name, code, or ID…"
             searchKeys={(p) => `${p.representative} ${p.householdCode} ${p.householdId}`}

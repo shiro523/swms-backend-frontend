@@ -10,7 +10,15 @@ import type { XlsxColumn } from "@/lib/exportXlsx";
 import { RecordPaymentDialog } from "@/components/households/RecordPaymentDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
-import { ALL, UNRECOGNIZED_YEAR, matchesYearMonth, parsePeriod, periodYearOptions } from "@/lib/paymentPeriod";
+import {
+  ALL,
+  UNRECOGNIZED_YEAR,
+  describeYearMonth,
+  matchesYearMonth,
+  parsePeriod,
+  periodYearOptions,
+  toFileSlug,
+} from "@/lib/paymentPeriod";
 import { YearMonthFilter } from "@/components/payments/YearMonthFilter";
 import { YearPaymentSummary } from "@/components/payments/YearPaymentSummary";
 import { householdsAwaitingPayment, UNPAID_LIST_ANCHOR } from "@/lib/householdStatus";
@@ -97,6 +105,7 @@ export default function PurokLeaderPaymentsPage() {
   const summaryYear = selectedYear !== ALL && selectedYear !== UNRECOGNIZED_YEAR ? Number(selectedYear) : null;
 
   const filteredPayments = payments.filter((p) => matchesYearMonth(p.period, selectedYear, monthFilter));
+  const selectionLabel = describeYearMonth(selectedYear, monthFilter);
 
   return (
     <div>
@@ -105,8 +114,15 @@ export default function PurokLeaderPaymentsPage() {
         title="Payments"
         description={currentPeriod ? `Monthly collection fee status for ${currentPeriod}.` : "Monthly collection fee status for households in your purok."}
         actions={
-          filteredPayments.length > 0 ? (
-            <ExportButton filename="my-payments" rows={filteredPayments} format="xlsx" columns={xlsxColumns} />
+          payments.length > 0 ? (
+            <ExportButton
+              filename={`my-payments-${toFileSlug(selectionLabel).replace(/^payments-/, "")}`}
+              rows={filteredPayments}
+              format="xlsx"
+              columns={xlsxColumns}
+              disabled={filteredPayments.length === 0}
+              disabledReason={`No payments for ${selectionLabel} to export.`}
+            />
           ) : undefined
         }
       />
@@ -202,8 +218,13 @@ export default function PurokLeaderPaymentsPage() {
               </div>
 
               <div className="mt-2">
+                <p className="mb-2 text-xs text-ink/50">
+                  Showing <span className="font-semibold text-ink/70">{filteredPayments.length}</span> payment
+                  {filteredPayments.length === 1 ? "" : "s"} · {selectionLabel}
+                </p>
                 <DataTable
                   data={filteredPayments}
+                  emptyMessage={`No payments for ${selectionLabel}.`}
                   columns={columns}
                   searchPlaceholder="Search by household or code…"
                   searchKeys={(p) => `${p.representative} ${p.householdCode} ${p.householdId}`}

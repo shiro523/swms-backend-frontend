@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function Modal({
@@ -25,10 +26,13 @@ export function Modal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto p-4 sm:items-center">
+  // Rendered into <body>, not where the component sits: a dialog opened from
+  // a table cell (e.g. a row's Complete button) would otherwise inherit the
+  // cell's no-wrap text and spill past the dialog's edges.
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto whitespace-normal p-4 sm:items-center">
       <div className="fixed inset-0 bg-ink/40 backdrop-blur-sm" onClick={onClose} />
       <div className={`relative z-10 w-full ${widthClassName} rounded-2xl border border-line bg-paper shadow-xl`}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
@@ -42,7 +46,8 @@ export function Modal({
         </div>
         <div className="px-5 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

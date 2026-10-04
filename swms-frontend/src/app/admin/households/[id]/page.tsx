@@ -14,18 +14,8 @@ import { QrSticker } from "@/app/resident/qr-code/QrSticker";
 import { useApi } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
 import { summarizeTrashLogs } from "@/lib/wasteMonitoring";
+import { restoreWindow, toPhDate } from "@/lib/dateTime";
 
-const RESTORE_WINDOW_DAYS = 30;
-
-function daysSince(iso: string) {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function addDays(iso: string, days: number) {
-  const d = new Date(iso);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 export default function HouseholdDetailPage() {
   const params = useParams<{ id: string }>();
@@ -88,9 +78,10 @@ export default function HouseholdDetailPage() {
 
       <AsyncSection query={query}>
         {({ household, payments, logs, violations }) => {
-          const removedDays = household.removedAt ? daysSince(household.removedAt) : null;
-          const canRestore = removedDays !== null && removedDays <= RESTORE_WINDOW_DAYS;
-          const recoveryDeadline = household.removedAt ? addDays(household.removedAt, RESTORE_WINDOW_DAYS) : null;
+          // Exact-time window, same rule as the server's restore check.
+          const recovery = household.removedAt ? restoreWindow(household.removedAt) : null;
+          const canRestore = recovery?.canRestore ?? false;
+          const recoveryDeadline = recovery?.deadlineDate ?? null;
           const accountStatus = household.removedAt ? "Removed" : "Active";
           const waste = summarizeTrashLogs(logs);
 
@@ -102,7 +93,9 @@ export default function HouseholdDetailPage() {
               description={`House representative for ${household.purokName}`}
               actions={
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={household.periodPaymentStatus} />
+                  {/* A removed household owes nothing this period — show its
+                      removed state instead of a misleading "Unpaid". */}
+                  <StatusBadge status={household.removedAt ? "removed" : household.periodPaymentStatus} />
                   {household.removedAt ? (
                     <>
                       {canRestore && (
@@ -134,7 +127,7 @@ export default function HouseholdDetailPage() {
 
             {household.removedAt && (
               <div className="mb-4 rounded-xl border border-clay/30 bg-clay-tint px-4 py-3 text-sm text-clay">
-                Removed on {household.removedAt.slice(0, 10)}
+                Removed on {toPhDate(household.removedAt)}
                 {household.removedByName ? ` by ${household.removedByName}` : ""}
                 {household.removalReason ? ` — ${household.removalReason}` : ""}.{" "}
                 {canRestore
@@ -153,7 +146,7 @@ export default function HouseholdDetailPage() {
                     <p className="flex items-center gap-2"><Mail size={14} className="text-ink/40" /> {household.username ? `@${household.username}` : "No account"} {household.email ? `· ${household.email}` : ""}</p>
                     <p className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {household.contactNumber}</p>
                     <p className="flex items-center gap-2"><MapPin size={14} className="text-ink/40" /> {household.address}, {household.purokName}</p>
-                    <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt?.slice(0, 10) ?? household.registeredAt}</p>
+                    <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt ? toPhDate(household.accountCreatedAt) : household.registeredAt}</p>
                   </div>
 
                   <p className="mt-5 text-sm font-semibold text-ink">Account information</p>
@@ -243,7 +236,7 @@ export default function HouseholdDetailPage() {
                       </div>
                       {v.notes && <p className="mt-1 text-xs text-ink/45">{v.notes}</p>}
                       {v.status === "completed" && v.resolvedByName && (
-                        <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${v.resolvedAt.slice(0, 10)}` : ""}</p>
+                        <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${toPhDate(v.resolvedAt)}` : ""}</p>
                       )}
                     </div>
                   ))}

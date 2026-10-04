@@ -48,6 +48,23 @@ export interface CollectionWeek {
   nextCollectionDate: string;
 }
 
+// Households at or over the violation limit (GET /violations/at-limit).
+export interface HouseholdAtLimit {
+  householdId: string;
+  householdCode: string;
+  representative: string;
+  purokName: string;
+  totalViolations: number;
+  activeViolations: number;
+  noticesSent: number;
+  lastNoticeDate: string | null;
+}
+
+export interface ViolationsAtLimit {
+  threshold: number;
+  households: HouseholdAtLimit[];
+}
+
 export interface Account {
   id: number;
   username: string;
@@ -138,6 +155,12 @@ export const api = {
   currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
   completeViolation: (id: string) => request<Violation>(`/violations/${id}/complete`, { method: "PATCH" }),
+  violationsAtLimit: () => request<ViolationsAtLimit>("/violations/at-limit"),
+  sendConsequenceNotice: (householdId: string, message: string) =>
+    request<{ ok: true; sentOn: string }>("/violations/consequence-notices", {
+      method: "POST",
+      body: JSON.stringify({ householdId, message }),
+    }),
   notifications: () => request<NotificationItem[]>("/notifications"),
   markNotificationRead: (id: string) =>
     request<NotificationItem>(`/notifications/${id}/read`, { method: "PATCH" }),

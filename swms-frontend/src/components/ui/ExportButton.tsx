@@ -11,7 +11,13 @@ export function ExportButton<T extends object>({
   label,
   format = "csv",
   columns,
+  disabled = false,
+  disabledReason,
 }: {
+  // e.g. no records for the current filter — shown as the button tooltip.
+  disabled?: boolean;
+  disabledReason?: string;
+
   filename: string;
   rows: T[];
   label?: string;
@@ -24,6 +30,7 @@ export function ExportButton<T extends object>({
   const [error, setError] = useState<string | null>(null);
 
   const handleClick = async () => {
+    if (disabled) return;
     if (format === "csv") {
       exportToCsv(filename, rows);
       return;
@@ -45,7 +52,8 @@ export function ExportButton<T extends object>({
   const button = (
     <button
       onClick={handleClick}
-      disabled={generating}
+      disabled={generating || disabled}
+      title={disabled ? disabledReason : undefined}
       className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-ink/70 transition-colors hover:border-pine/40 hover:text-pine-dark disabled:cursor-not-allowed disabled:opacity-60"
     >
       {generating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}

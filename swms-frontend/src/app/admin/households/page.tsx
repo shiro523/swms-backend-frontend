@@ -9,23 +9,17 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { complianceLabel, complianceExportValue } from "@/lib/householdStatus";
+import { restoreWindow, toPhDateOrDash } from "@/lib/dateTime";
 import { Household } from "@/lib/types";
-
-const RESTORE_WINDOW_DAYS = 30;
-
-function daysSince(iso: string) {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-}
 
 // "Removed on <date>" — 30-day recovery window measured from removedAt,
 // mirroring the admin Puroks archived-list's exact daysSince/RESTORE_WINDOW
 // pattern (see admin/puroks/[id]/page.tsx).
 function recoveryStatus(removedAt: string | null) {
   if (!removedAt) return "—";
-  const elapsed = daysSince(removedAt);
-  const remaining = RESTORE_WINDOW_DAYS - elapsed;
-  if (remaining <= 0) return "Restore window passed";
-  return `${remaining} day${remaining === 1 ? "" : "s"} left to restore`;
+  const { canRestore, daysLeft } = restoreWindow(removedAt);
+  if (!canRestore) return "Restore window passed";
+  return `${daysLeft} day${daysLeft === 1 ? "" : "s"} left to restore`;
 }
 
 const activeColumns: Column<Household>[] = [
@@ -55,7 +49,7 @@ const removedColumns: Column<Household>[] = [
     ),
   },
   { header: "Purok", accessor: (h) => h.purokName },
-  { header: "Removed on", accessor: (h) => h.removedAt?.slice(0, 10) ?? "—" },
+  { header: "Removed on", accessor: (h) => toPhDateOrDash(h.removedAt) },
   { header: "Reason", accessor: (h) => h.removalReason ?? "—" },
   { header: "Removed by", accessor: (h) => h.removedByName ?? "—" },
   { header: "Recovery", accessor: (h) => recoveryStatus(h.removedAt) },

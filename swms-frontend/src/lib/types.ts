@@ -129,6 +129,8 @@ export interface NotificationItem {
   read: boolean;
   targetPurokName: string | null;
   targetHouseholdCode: string | null;
+  // Purok-wide alert for the purok leader only (not shown to residents).
+  leaderOnly?: boolean;
 }
 
 export interface SystemSettings {

@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { ViolationStatusBadge } from "@/components/violations/ViolationStatusBadge";
 import { CompleteViolationButton } from "@/components/violations/CompleteViolationButton";
+import { ViolationLimitCard } from "@/components/violations/ViolationLimitCard";
 import { formatResolvedDate } from "@/lib/violation";
 import type { XlsxColumn } from "@/lib/exportXlsx";
 import { useApi } from "@/hooks/useApi";
@@ -33,9 +34,10 @@ export default function PurokLeaderViolationsPage() {
   const [filter, setFilter] = useState<Filter>("active");
   const query = useApi(
     () =>
-      Promise.all([api.puroks(), api.violations()]).then(([puroks, violations]) => ({
+      Promise.all([api.puroks(), api.violations(), api.violationsAtLimit()]).then(([puroks, violations, atLimit]) => ({
         purok: puroks[0],
         violations,
+        atLimit,
       })),
     [],
   );
@@ -88,6 +90,10 @@ export default function PurokLeaderViolationsPage() {
           )
         }
       />
+
+      {query.data && (
+        <ViolationLimitCard data={query.data.atLimit} canNotify={false} onSent={() => query.reload()} />
+      )}
 
       <div className="mb-4 flex gap-2">
         {(
