@@ -23,7 +23,7 @@ const xlsxColumns: XlsxColumn<TrashLog>[] = [
   { header: "Date", accessor: (t) => t.date },
   { header: "Time", accessor: (t) => t.time },
   { header: "Status", accessor: (t) => t.status },
-  { header: "Disposed By", accessor: (t) => DISPOSED_BY_LABEL[t.disposedBy] },
+  { header: "Disposed By", accessor: (t) => (t.status === "missed" ? "—" : DISPOSED_BY_LABEL[t.disposedBy]) },
   { header: "Collector", accessor: (t) => t.collector },
   { header: "Notes", accessor: (t) => t.notes ?? "" },
 ];

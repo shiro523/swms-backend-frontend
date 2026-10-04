@@ -3,7 +3,6 @@ import { z } from "zod";
 export const createPurokSchema = z.object({
   name: z.string().trim().min(1, "Purok name and leader name are required.").max(120),
   leaderName: z.string().trim().min(1, "Purok name and leader name are required.").max(120),
-  complianceRate: z.coerce.number().min(0).max(100).optional().default(100),
   // A purok-leader login account is created alongside the purok.
   username: z.string().trim().min(3, "Username, password, and email are required for the leader account."),
   password: z.string().min(8, "Password must be at least 8 characters."),

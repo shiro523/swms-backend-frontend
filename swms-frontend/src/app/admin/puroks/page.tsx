@@ -70,19 +70,26 @@ export default function PuroksPage() {
                       ) : (
                         <span
                           className={`stamp rounded-full px-2.5 py-1 text-[10.5px] font-medium ${
-                            p.complianceRate >= 90
+                            p.complianceRate === null
+                              ? "bg-panel text-ink/50"
+                              : p.complianceRate >= 90
                               ? "bg-pine-tint text-pine-dark"
                               : p.complianceRate >= 80
                               ? "bg-azure-tint text-azure"
                               : "bg-gold-tint text-gold"
                           }`}
                         >
-                          {p.complianceRate}% compliant
+                          {p.complianceRate === null ? "No records yet" : `${p.complianceRate}% compliant`}
                         </span>
                       )}
                     </div>
                     <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm">
-                      <span className="text-ink/50">Households</span>
+                      <span className="text-ink/50">
+                        Active households
+                        {p.removedHouseholds > 0 && (
+                          <span className="ml-1 text-xs text-ink/35">({p.removedHouseholds} removed)</span>
+                        )}
+                      </span>
                       <span className="font-[family-name:var(--font-display)] font-semibold text-ink">
                         {p.households}
                       </span>

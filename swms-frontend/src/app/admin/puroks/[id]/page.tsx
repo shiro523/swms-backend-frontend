@@ -7,6 +7,7 @@ import { ArrowLeft, Mail, ShieldCheck, Users, Archive, ArchiveRestore, Trash2, C
 import { Card, PageHeader } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { Modal } from "@/components/ui/Modal";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EditPurokDialog } from "@/components/puroks/EditPurokDialog";
 import { useApi } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
@@ -70,13 +71,25 @@ export default function PurokDetailPage() {
           const canRestore = archivedDays !== null && archivedDays <= RESTORE_WINDOW_DAYS;
           // Not time-gated — the 30-day window only governs how long restore
           // stays available (canRestore above). Deletion only ever depends
-          // on zero dependent households, matching purok.service.ts.
-          const canPermanentlyDelete = archivedDays !== null && (purok?.households ?? 0) === 0;
+          // on zero dependent households — active OR removed, since removed
+          // households keep their history — matching purok.service.ts.
+          const totalHouseholds = (purok?.households ?? 0) + (purok?.removedHouseholds ?? 0);
+          const canPermanentlyDelete = archivedDays !== null && totalHouseholds === 0;
+          // Active accounts first; removed households' accounts listed after.
+          const residents = [...accounts.residents].sort(
+            (a, b) => Number(a.householdRemoved ?? false) - Number(b.householdRemoved ?? false),
+          );
 
           return (
             <>
               <PageHeader
-                eyebrow={purok ? `${purok.households} households` : ""}
+                eyebrow={
+                  purok
+                    ? `${purok.households} active household${purok.households === 1 ? "" : "s"}${
+                        purok.removedHouseholds > 0 ? ` · ${purok.removedHouseholds} removed` : ""
+                      }`
+                    : ""
+                }
                 title={purok?.name ?? "Purok"}
                 description={`Login accounts registered under ${purok?.name ?? "this purok"}.`}
                 actions={
@@ -113,7 +126,7 @@ export default function PurokDetailPage() {
                             disabled={!canPermanentlyDelete}
                             title={
                               !canPermanentlyDelete
-                                ? "This purok still has households and cannot be permanently deleted."
+                                ? "This purok still has households (including removed ones, whose history is kept) and cannot be permanently deleted."
                                 : undefined
                             }
                             className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3.5 py-2 text-[13px] font-medium text-clay disabled:cursor-not-allowed disabled:opacity-40"
@@ -162,7 +175,10 @@ export default function PurokDetailPage() {
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-ink">
                     <Users size={14} className="text-ink/40" /> Resident accounts
                   </p>
-                  <p className="text-xs text-ink/50">Every resident login account belonging to a household in this purok.</p>
+                  <p className="text-xs text-ink/50">
+                    Every resident login account belonging to a household in this purok. Accounts of removed households
+                    are kept for history and can no longer log in.
+                  </p>
                   <div className="mt-3 overflow-x-auto">
                     <table className="w-full text-left text-sm">
                       <thead>
@@ -174,12 +190,17 @@ export default function PurokDetailPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {accounts.residents.map((r) => (
-                          <tr key={r.id} className="ledger-row">
+                        {residents.map((r) => (
+                          <tr key={r.id} className={`ledger-row ${r.householdRemoved ? "opacity-55" : ""}`}>
                             <td className="px-2 py-2.5">{r.username}</td>
                             <td className="px-2 py-2.5 text-ink/70">{r.name}</td>
                             <td className="px-2 py-2.5 text-ink/50">{r.email}</td>
-                            <td className="px-2 py-2.5 text-ink/50">{r.householdCode ?? "—"}</td>
+                            <td className="px-2 py-2.5 text-ink/50">
+                              <span className="flex items-center gap-2">
+                                {r.householdCode ?? "—"}
+                                {r.householdRemoved && <StatusBadge status="removed" />}
+                              </span>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

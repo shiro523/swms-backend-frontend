@@ -49,7 +49,7 @@ export default function TrashLogDetailPage() {
                   <p className="flex items-center gap-2"><User size={14} className="text-ink/40" /> Collector: {log.collector}</p>
                   <p className="flex items-center gap-2">
                     <User size={14} className="text-ink/40" />
-                    Disposed by: {log.disposedBy === "owner" ? "Household Representative" : "Family Member / Other Person"}
+                    Disposed by: {log.status === "missed" ? "— (no collection recorded)" : log.disposedBy === "owner" ? "Household Representative" : "Family Member / Other Person"}
                   </p>
                 </div>
 

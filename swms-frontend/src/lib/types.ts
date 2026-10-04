@@ -12,6 +12,9 @@ export interface SessionUser {
 
 export type ComplianceStatus = "compliant" | "violation" | "missed";
 export type PaymentStatus = "paid" | "unpaid";
+// Paid/unpaid for the current billing period, computed by the server from
+// real payments. "new": registered this month and not paid yet.
+export type PeriodPaymentStatus = "paid" | "unpaid" | "new";
 export type ViolationType =
   | "Improper Segregation"
   | "Missed Collection"
@@ -21,8 +24,14 @@ export interface Purok {
   id: string;
   name: string;
   leader: string;
+  // Active households only.
   households: number;
-  complianceRate: number;
+  // Removed (inactive) households still linked to this purok — their
+  // history is kept, and they still block permanent deletion.
+  removedHouseholds: number;
+  // Live average over the purok's active households that have trash logs;
+  // null when none do yet (no records, so no rate to show).
+  complianceRate: number | null;
   // ISO timestamp, or null if active. Display/countdown only — the real
   // restore/delete eligibility is always re-checked server-side.
   archivedAt: string | null;
@@ -45,8 +54,14 @@ export interface Household {
   contactNumber: string;
   members: FamilyMember[];
   registeredAt: string;
+  // Legacy stored flag ("has ever paid") — don't display it; use
+  // periodPaymentStatus.
   paymentStatus: PaymentStatus;
+  periodPaymentStatus: PeriodPaymentStatus;
   complianceRate: number;
+  // False until the household's first trash log; complianceRate is only a
+  // placeholder until then (see lib/householdStatus.ts).
+  hasCollectionRecords: boolean;
   username: string | null;
   email: string | null;
   // The resident login account's own creation date, or null if the

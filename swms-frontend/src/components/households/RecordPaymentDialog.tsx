@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Wallet, Loader2 } from "lucide-react";
 import { Modal, Field, inputClass } from "@/components/ui/Modal";
 import { api } from "@/lib/api";
+import { moneyInputProps, toMoney } from "@/lib/numericInput";
 import type { Payment } from "@/lib/types";
 
 export function RecordPaymentDialog({
@@ -98,12 +99,10 @@ export function RecordPaymentDialog({
           </Field>
           <Field label="Amount (₱)">
             <input
-              type="number"
-              step="0.01"
-              min="0.01"
+              {...moneyInputProps}
               className={inputClass}
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(toMoney(e.target.value))}
               required
             />
           </Field>

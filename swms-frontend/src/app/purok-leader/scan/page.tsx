@@ -1,13 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { Camera, CheckCircle2, ScanLine, TriangleAlert, RotateCcw, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { Card, PageHeader } from "@/components/ui/Primitives";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { api, ApiError } from "@/lib/api";
 import { Household, TrashLog } from "@/lib/types";
+
+const SCANNER_ELEMENT_ID = "qr-reader";
+
+// Only QR codes (skips trying ~15 barcode formats on every frame), and the
+// browser's native BarcodeDetector where available (Chrome/Edge/Android),
+// which decodes far faster and more reliably than the JS fallback.
+const SCANNER_CONFIG = {
+  verbose: false,
+  formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+  useBarCodeDetectorIfSupported: true,
+};
+
+// Only the area inside qrbox is decoded, so make it most of the frame (70%
+// of the shorter side) instead of a fixed 240px square that was a small
+// slice of a large video.
+function qrboxSize(viewfinderWidth: number, viewfinderHeight: number) {
+  const size = Math.max(160, Math.floor(Math.min(viewfinderWidth, viewfinderHeight) * 0.7));
+  return { width: size, height: size };
+}
 
 function normalizeCode(value: string) {
   return value.trim().toUpperCase();
@@ -38,25 +57,48 @@ export default function PurokLeaderScanPage() {
   const [disposedBy, setDisposedBy] = useState<"owner" | "representative" | null>(null);
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // Confirmation of the last saved log, shown in the empty result panel
+  // while the camera is back to scanning for the next household.
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const [purokName, setPurokName] = useState("");
   const [logs, setLogs] = useState<TrashLog[]>([]);
   const householdsRef = useRef<Household[]>([]);
   const logsRef = useRef<TrashLog[]>([]);
+  // First day (YYYY-MM-DD) of the current weekly collection window, from the
+  // server; null until loaded, when the hint falls back to today only.
+  const weekStartRef = useRef<string | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const isMountedRef = useRef(true);
+  // True once a scan has been matched, until "Scan another household" —
+  // the library can fire the success callback for several frames in a row
+  // before stop() takes effect.
+  const decodeHandledRef = useRef(false);
+  // Every camera start/stop runs through this queue, one at a time. Without
+  // it, React Strict Mode's dev-only mount -> unmount -> mount started a
+  // second camera stream while the first start() was still pending (so the
+  // cleanup's stop() saw nothing to stop), leaving two live videos stacked
+  // in the same viewfinder.
+  const cameraQueueRef = useRef<Promise<void>>(Promise.resolve());
 
-  // Load the leader's households (for QR matching) and existing logs (for the
-  // duplicate-today hint). The backend re-checks scope and duplicates on save.
+  const runCameraTask = useCallback((task: () => Promise<void>) => {
+    const run = cameraQueueRef.current.then(task);
+    cameraQueueRef.current = run.catch(() => undefined);
+    return run;
+  }, []);
+
+  // Load the leader's households (for QR matching), existing logs and the
+  // current collection week (for the "already collected this week" hint).
+  // The backend re-checks scope and duplicates on save.
   useEffect(() => {
     let cancelled = false;
-    Promise.all([api.puroks(), api.households(), api.trashLogs()])
-      .then(([puroks, households, trashLogs]) => {
+    Promise.all([api.puroks(), api.households(), api.trashLogs(), api.collectionWeek()])
+      .then(([puroks, households, trashLogs, collectionWeek]) => {
         if (cancelled) return;
         setPurokName(puroks[0]?.name ?? "");
         householdsRef.current = households;
+        weekStartRef.current = collectionWeek.weekStart;
         logsRef.current = trashLogs;
         setLogs(trashLogs);
       })
@@ -69,6 +111,7 @@ export default function PurokLeaderScanPage() {
   }, []);
 
   const handleDecoded = useCallback(async (html5QrCode: Html5Qrcode, decodedText: string) => {
+    if (decodeHandledRef.current) return;
     const normalizedCode = normalizeCode(decodedText);
     const matchedHousehold = householdsRef.current.find(
       (household) => normalizeCode(household.code) === normalizedCode,
@@ -81,30 +124,46 @@ export default function PurokLeaderScanPage() {
       return;
     }
 
-    const today = todayIso();
+    // Trash is collected weekly: one log per household per collection week.
+    // An automatic "missed" log doesn't count — a late pickup replaces it.
+    const weekStart = weekStartRef.current ?? todayIso();
     const existingLog = logsRef.current.find(
-      (log) => log.householdId === matchedHousehold.id && log.date === today,
+      (log) => log.householdId === matchedHousehold.id && log.date >= weekStart && log.status !== "missed",
     );
     const alreadyCollected = Boolean(existingLog);
-    const message = alreadyCollected
-      ? `Already collected today at ${existingLog?.time ?? "recently"}.`
+    const message = existingLog
+      ? `Already logged this collection week (${existingLog.date}${existingLog.time ? ` at ${existingLog.time}` : ""}).`
       : `Matched ${matchedHousehold.code}.`;
 
+    decodeHandledRef.current = true;
     setSelectedHousehold(matchedHousehold);
     setScannerState(alreadyCollected ? "error" : "success");
     setStatusMessage(message);
     setDuplicateMessage(alreadyCollected ? message : null);
     setCameraError(null);
 
-    if (html5QrCode.isScanning) {
-      await html5QrCode.stop().catch(() => undefined);
-    }
-  }, []);
+    await runCameraTask(async () => {
+      if (html5QrCode.isScanning) {
+        await html5QrCode.stop().catch(() => undefined);
+      }
+    });
+  }, [runCameraTask]);
 
   const startScanning = useCallback(async (html5QrCode: Html5Qrcode, isCancelled: () => boolean) => {
     await html5QrCode.start(
       { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 240, height: 240 } },
+      {
+        fps: 15,
+        qrbox: qrboxSize,
+        // Ask for HD — the browser default (often 640x480) leaves a printed
+        // sticker only a few dozen pixels wide unless held very close.
+        // "ideal" values fall back gracefully on cameras that can't do it.
+        videoConstraints: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
       (decodedText) => {
         if (isCancelled()) return;
         void handleDecoded(html5QrCode, decodedText);
@@ -115,56 +174,55 @@ export default function PurokLeaderScanPage() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    const html5QrCode = new Html5Qrcode("qr-reader");
-    scannerRef.current = html5QrCode;
+    // Per-run flag (not isMountedRef): in Strict Mode the remount flips
+    // isMountedRef back to true before the first run's queued start gets its
+    // turn, and that stale start must still be skipped.
+    let active = true;
+    let html5QrCode: Html5Qrcode | null = null;
 
-    async function stopIfScanning() {
-      if (html5QrCode.isScanning) {
-        await html5QrCode.stop().catch(() => undefined);
-      }
-    }
-
-    async function initScanner() {
-      if (!containerRef.current) return;
-
+    void runCameraTask(async () => {
+      if (!active) return;
+      html5QrCode = new Html5Qrcode(SCANNER_ELEMENT_ID, SCANNER_CONFIG);
+      scannerRef.current = html5QrCode;
       try {
-        await startScanning(html5QrCode, () => !isMountedRef.current);
-
-        // Effect cleanup can fire (e.g. React Strict Mode's mount/unmount/remount in dev)
-        // while start() is still resolving; stop immediately instead of leaving an orphaned stream.
-        if (!isMountedRef.current) {
-          await stopIfScanning();
-          return;
-        }
-
+        await startScanning(html5QrCode, () => !active);
+        if (!active) return; // the queued cleanup below stops it
         setScannerState("scanning");
         setStatusMessage("Camera is live. Point it at a household QR sticker.");
         setCameraError(null);
       } catch (error) {
-        if (isMountedRef.current) {
-          const fallbackMessage = error instanceof Error ? error.message : "Unable to access the camera.";
-          setScannerState("error");
-          setStatusMessage("Camera permission denied or unavailable.");
-          setCameraError(fallbackMessage);
-        }
+        if (!active) return;
+        const fallbackMessage = error instanceof Error ? error.message : "Unable to access the camera.";
+        setScannerState("error");
+        setStatusMessage("Camera permission denied or unavailable.");
+        setCameraError(fallbackMessage);
       }
-    }
-
-    void initScanner();
+    });
 
     return () => {
+      active = false;
       isMountedRef.current = false;
-      void stopIfScanning().then(() => {
+      void runCameraTask(async () => {
+        const scanner = html5QrCode;
+        if (!scanner) return;
+        if (scanner.isScanning) {
+          await scanner.stop().catch(() => undefined);
+        }
         try {
-          html5QrCode.clear();
+          scanner.clear();
         } catch {
           // ignore — element may already be detached during unmount
         }
+        if (scannerRef.current === scanner) scannerRef.current = null;
       });
     };
-  }, [startScanning]);
+  }, [startScanning, runCameraTask]);
 
-  async function handleRescan() {
+  // Clears the result panel and restarts the camera. `savedNotice` (after a
+  // successful save) is shown in the empty panel so the leader can see the
+  // log went through while moving on to the next household.
+  async function handleRescan(savedNotice?: string) {
+    setSavedMessage(savedNotice ?? null);
     setSelectedHousehold(null);
     setDuplicateMessage(null);
     setCameraError(null);
@@ -172,25 +230,25 @@ export default function PurokLeaderScanPage() {
     setAction("collected");
     setDisposedBy(null);
 
-    const html5QrCode = scannerRef.current;
-    if (!html5QrCode) return;
+    decodeHandledRef.current = false;
 
     try {
-      if (!html5QrCode.isScanning) {
-        await startScanning(html5QrCode, () => !isMountedRef.current);
-      }
-
-      // The component may have unmounted while start() was still resolving above —
-      // stop the stream we just opened instead of leaving it running in the background.
-      if (!isMountedRef.current) {
-        if (html5QrCode.isScanning) {
-          await html5QrCode.stop().catch(() => undefined);
+      await runCameraTask(async () => {
+        const html5QrCode = scannerRef.current;
+        if (!html5QrCode || !isMountedRef.current) return;
+        if (!html5QrCode.isScanning) {
+          await startScanning(html5QrCode, () => !isMountedRef.current);
         }
-        return;
-      }
+      });
+      // If the page unmounted meanwhile, its queued cleanup stops the camera.
+      if (!isMountedRef.current) return;
 
       setScannerState("scanning");
-      setStatusMessage("Camera is live. Point it at a household QR sticker.");
+      setStatusMessage(
+        savedNotice
+          ? `${savedNotice} Ready for the next household.`
+          : "Camera is live. Point it at a household QR sticker.",
+      );
     } catch (error) {
       if (!isMountedRef.current) return;
       const fallbackMessage = error instanceof Error ? error.message : "Unable to access the camera.";
@@ -236,11 +294,13 @@ export default function PurokLeaderScanPage() {
       logsRef.current = next;
       setLogs(next);
 
-      setScannerState("success");
-      setStatusMessage(`Logged ${action === "violation" ? "violation" : "collection"} for ${selectedHousehold.code}.`);
-      setDuplicateMessage(null);
-      setNote("");
-      setDisposedBy(null);
+      // Done with this household: clear the form and go straight back to
+      // scanning. Leaving the saved household and its form on screen made a
+      // successful save look like nothing happened, inviting a second save
+      // that the backend then rejects as a same-day duplicate.
+      await handleRescan(
+        `Logged ${action === "violation" ? "violation" : "collection"} for ${selectedHousehold.code} (${selectedHousehold.representative}).`,
+      );
     } catch (err) {
       setScannerState("error");
       if (err instanceof ApiError && err.status === 409) {
@@ -286,11 +346,10 @@ export default function PurokLeaderScanPage() {
             <StatusBadge status={scannerState === "scanning" ? "active" : scannerState === "success" ? "compliant" : "pending"} />
           </div>
 
-          <div className="relative min-h-[340px] bg-[#0d1f18]">
-            <div id="qr-reader" ref={containerRef} className="min-h-[340px] w-full" />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="h-48 w-48 rounded-[2rem] border-[3px] border-white/80 shadow-[0_0_0_9999px_rgba(13,31,24,0.55)]" />
-            </div>
+          {/* The scanner library draws the only frame overlay itself — shaded
+              edges with corner guides marking exactly the area it decodes. */}
+          <div className="min-h-[340px] bg-[#0d1f18]">
+            <div id={SCANNER_ELEMENT_ID} className="min-h-[340px] w-full" />
           </div>
 
           <div className="border-t border-line bg-paper/80 px-4 py-4 text-sm text-ink/70">
@@ -323,13 +382,21 @@ export default function PurokLeaderScanPage() {
           </div>
 
           {!selectedHousehold ? (
-            <div className="mt-4 rounded-2xl border border-dashed border-line bg-paper/50 p-6 text-center text-sm text-ink/55">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-panel">
-                <AlertCircle size={18} className="text-ink/40" />
+            <>
+              {savedMessage && (
+                <div className="mt-4 flex items-start gap-2 rounded-2xl border border-pine/20 bg-pine-tint p-4 text-sm text-pine-dark">
+                  <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+                  <span>{savedMessage}</span>
+                </div>
+              )}
+              <div className="mt-4 rounded-2xl border border-dashed border-line bg-paper/50 p-6 text-center text-sm text-ink/55">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-panel">
+                  <AlertCircle size={18} className="text-ink/40" />
+                </div>
+                <p className="mt-3 font-medium text-ink">Awaiting scan</p>
+                <p className="mt-1">The household details will appear here after a valid QR is scanned.</p>
               </div>
-              <p className="mt-3 font-medium text-ink">Awaiting scan</p>
-              <p className="mt-1">The household details will appear here after a valid QR is scanned.</p>
-            </div>
+            </>
           ) : (
             <div className="mt-4 space-y-4">
               <div className="rounded-2xl border border-pine/20 bg-pine-tint p-4">
@@ -390,7 +457,7 @@ export default function PurokLeaderScanPage() {
                         </button>
                       ))}
                     </div>
-                    {!disposedBy && (
+                    {!disposedBy && !duplicateMessage && (
                       <p className="text-xs text-clay">Select who disposed of the trash to continue.</p>
                     )}
                   </div>
@@ -405,7 +472,9 @@ export default function PurokLeaderScanPage() {
                 <button
                   type="button"
                   onClick={handleAction}
-                  disabled={submitting || (action !== "note" && !disposedBy)}
+                  // Already logged today (found at scan time or rejected by the
+                  // server): a second collection/violation can't be saved.
+                  disabled={submitting || (action !== "note" && (!disposedBy || duplicateMessage !== null))}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl bg-pine px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pine-dark disabled:opacity-50"
                 >
                   {submitting ? (
@@ -420,7 +489,7 @@ export default function PurokLeaderScanPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleRescan}
+                  onClick={() => void handleRescan()}
                   disabled={submitting}
                   className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line bg-paper px-4 py-2.5 text-sm font-medium text-ink/70 hover:border-pine/40 disabled:opacity-50"
                 >

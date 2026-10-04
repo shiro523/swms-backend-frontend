@@ -22,7 +22,7 @@ const columns: Column<TrashLog>[] = [
     ) },
   { header: "Purok", accessor: (t) => t.purokName },
   { header: "Collector", accessor: (t) => t.collector },
-  { header: "Disposed by", accessor: (t) => (t.disposedBy === "owner" ? "Owner" : "Representative") },
+  { header: "Disposed by", accessor: (t) => (t.status === "missed" ? "—" : t.disposedBy === "owner" ? "Owner" : "Representative") },
   { header: "Status", accessor: (t) => <StatusBadge status={t.status} /> },
 ];
 
@@ -41,18 +41,44 @@ function toLocalIso(d: Date) {
 
 // Defaults to "this calendar month so far" instead of a fixed date, so the
 // page never again silently defaults to a stale month.
-function currentMonthRange() {
+type RangePreset = "30d" | "month" | "all";
+
+// The date range for a preset; "all" = no bounds. Defaults to the last 30
+// days so recent scans (including the end of last month) are always shown —
+// a "this month" default left the page empty on the 1st.
+function presetRange(preset: RangePreset) {
   const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  return { from: toLocalIso(first), to: toLocalIso(now) };
+  if (preset === "all") return { from: "", to: "" };
+  const start =
+    preset === "month"
+      ? new Date(now.getFullYear(), now.getMonth(), 1)
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+  return { from: toLocalIso(start), to: toLocalIso(now) };
 }
 
+const PRESETS: { key: RangePreset; label: string }[] = [
+  { key: "30d", label: "Last 30 days" },
+  { key: "month", label: "This month" },
+  { key: "all", label: "All dates" },
+];
+
 export default function TrashLogsPage() {
-  const [from, setFrom] = useState(() => currentMonthRange().from);
-  const [to, setTo] = useState(() => currentMonthRange().to);
+  const [from, setFrom] = useState(() => presetRange("30d").from);
+  const [to, setTo] = useState(() => presetRange("30d").to);
   const query = useApi(() => api.trashLogs(), []);
 
-  const filtered = (query.data ?? []).filter((t) => t.date >= from && t.date <= to);
+  const applyPreset = (preset: RangePreset) => {
+    const range = presetRange(preset);
+    setFrom(range.from);
+    setTo(range.to);
+  };
+  const activePreset = PRESETS.find((p) => {
+    const range = presetRange(p.key);
+    return range.from === from && range.to === to;
+  })?.key;
+
+  // Empty bound = unbounded on that side.
+  const filtered = (query.data ?? []).filter((t) => (!from || t.date >= from) && (!to || t.date <= to));
 
   return (
     <div>
@@ -64,7 +90,19 @@ export default function TrashLogsPage() {
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-xs font-medium text-ink/50">Date range</span>
+        {PRESETS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => applyPreset(p.key)}
+            className={`stamp rounded-lg border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+              activePreset === p.key ? "border-pine bg-pine-tint text-pine-dark" : "border-line bg-paper text-ink/50 hover:text-ink"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <span className="ml-2 text-xs font-medium text-ink/50">Date range</span>
         <input
           type="date"
           value={from}

@@ -1,12 +1,11 @@
 import { z } from "zod";
+import { contactNumberField } from "@/schema/household.schema";
 
-// No Philippine-specific phone format is enforced — this project has no such
-// convention elsewhere (household/purok contact numbers are plain strings
-// too) — just a reasonable length ceiling.
+// Same contact-number rule as households: digits only, at most 11.
 export const updateSettingsSchema = z.object({
   barangayName: z.string().trim().min(1, "Barangay name is required.").max(120),
   municipality: z.string().trim().min(1, "Municipality is required.").max(120),
-  contactNumber: z.string().trim().min(1, "Contact number is required.").max(40),
+  contactNumber: z.string().trim().min(1, "Contact number is required.").pipe(contactNumberField),
   // Coerced from the form's string input, like complianceRate elsewhere in
   // this codebase. Two-decimal precision matches the column's Decimal(10,2).
   monthlyCollectionFee: z.coerce

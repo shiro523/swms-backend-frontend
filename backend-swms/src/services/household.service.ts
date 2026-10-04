@@ -2,7 +2,8 @@ import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import { householdRepository } from "@/repositories/household.repository";
 import { userRepository } from "@/repositories/user.repository";
-import { mapHousehold, mapFamilyMember } from "@/utils/mappers";
+import { mapHousehold, mapFamilyMember, type PeriodPaymentStatus } from "@/utils/mappers";
+import { paymentService } from "@/services/payment.service";
 import { householdScopeWhere, canAccessHousehold } from "@/utils/scope";
 import { getDbToday, getDbNow } from "@/lib/dbTime";
 import { HttpError, isUniqueConflict } from "@/middlewares/error.middleware";
@@ -40,16 +41,44 @@ interface AddMemberInput {
   age: number;
 }
 
+// Payment status for the current billing period, from real Payment rows —
+// the stored Household.paymentStatus only means "has ever paid" and never
+// resets. A household registered during the current month that hasn't paid
+// yet is "new" rather than "unpaid", so a just-created household isn't
+// shown as owing.
+function periodPaymentStatus(
+  household: { id: string; registeredAt: Date },
+  paidIds: Set<string>,
+  today: Date,
+): PeriodPaymentStatus {
+  if (paidIds.has(household.id)) return "paid";
+  const registered = household.registeredAt;
+  const registeredThisMonth =
+    registered.getUTCFullYear() === today.getUTCFullYear() && registered.getUTCMonth() === today.getUTCMonth();
+  return registeredThisMonth ? "new" : "unpaid";
+}
+
+// Maps rows (all matching `householdWhere`) with their current-period
+// payment status — one extra query for the whole batch.
+async function mapWithPaymentStatus<T extends { id: string; registeredAt: Date }>(
+  rows: T[],
+  householdWhere: Record<string, unknown>,
+) {
+  const [today, { period }] = await Promise.all([getDbToday(), paymentService.currentPeriod()]);
+  const paidIds = await householdRepository.householdIdsPaidForPeriod(householdWhere, period);
+  return rows.map((row) => mapHousehold(row, periodPaymentStatus(row, paidIds, today)));
+}
+
 async function getById(user: AuthContext, id: string, skipAccessCheck = false) {
-  if (!skipAccessCheck) {
-    const raw = await householdRepository.findRawById(id);
-    if (!canAccessHousehold(user, raw)) {
-      throw new HttpError(404, "Household not found");
-    }
-  }
+  // One read serves both the access check and the response — the full row
+  // carries the same id/purokId canAccessHousehold() needs. Out-of-scope and
+  // missing still produce the identical 404.
   const row = await householdRepository.findById(id);
-  if (!row) throw new HttpError(404, "Household not found");
-  return mapHousehold(row);
+  if (!row || (!skipAccessCheck && !canAccessHousehold(user, row))) {
+    throw new HttpError(404, "Household not found");
+  }
+  const [mapped] = await mapWithPaymentStatus([row], { id });
+  return mapped;
 }
 
 export const householdService = {
@@ -61,8 +90,9 @@ export const householdService = {
   async list(user: AuthContext, includeRemoved = false) {
     const where = householdScopeWhere(user);
     const removedFilter = includeRemoved ? { removedAt: { not: null } } : { removedAt: null };
-    const rows = await householdRepository.findMany({ ...where, ...removedFilter });
-    return rows.map(mapHousehold);
+    const householdWhere = { ...where, ...removedFilter };
+    const rows = await householdRepository.findMany(householdWhere);
+    return mapWithPaymentStatus(rows, householdWhere);
   },
 
   async create(user: AuthContext, input: CreateHouseholdInput) {
@@ -148,7 +178,9 @@ export const householdService = {
       await householdRepository.update(id, data);
     }
 
-    if (input.username || input.email) {
+    // The resident account mirrors the representative name, so a rename is
+    // synced even when username/email are not part of this update.
+    if (input.username || input.email || data.representative) {
       const resident = await userRepository.findByHouseholdId(id);
       if (resident) {
         const accountData: { username?: string; email?: string; name?: string } = {};
@@ -264,7 +296,8 @@ export const householdService = {
       removalReason: reason,
       removedByName: user.name,
     });
-    return mapHousehold(row);
+    const [mapped] = await mapWithPaymentStatus([row], { id: householdId });
+    return mapped;
   },
 
   // Admin-only (enforced by requireRole("admin") at the route level, same
@@ -289,7 +322,8 @@ export const householdService = {
       throw new HttpError(400, "This household was removed more than 30 days ago and can no longer be restored.");
     }
     const row = await householdRepository.restore(householdId);
-    return mapHousehold(row);
+    const [mapped] = await mapWithPaymentStatus([row], { id: householdId });
+    return mapped;
   },
 
   // Hard delete — admin-only (enforced by requireRole("admin") at the route

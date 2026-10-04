@@ -10,6 +10,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (username: string, password: string) => Promise<SessionUser>;
   logout: () => Promise<void>;
+  /** Re-reads the session user (e.g. after editing one's own name). */
+  refresh: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -44,6 +46,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user;
   };
 
+  const refresh = async () => {
+    try {
+      const { user } = await api.me();
+      setUser(user);
+    } catch {
+      // Keep the current user on a transient failure.
+    }
+  };
+
   const logout = async () => {
     try {
       await api.logout();
@@ -53,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

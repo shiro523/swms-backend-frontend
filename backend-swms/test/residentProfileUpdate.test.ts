@@ -36,12 +36,12 @@ describe("resident personal-information update", () => {
     const newEmail = `updated-${runId}@example-test.invalid`;
     const res = await residentAgent.patch(`/api/households/${household.householdId}`).send({
       email: newEmail,
-      contactNumber: "0911-222-3333",
+      contactNumber: "09112223333",
       address: "456 Updated Street",
     });
 
     expect(res.status).toBe(200);
-    expect(res.body.contactNumber).toBe("0911-222-3333");
+    expect(res.body.contactNumber).toBe("09112223333");
     expect(res.body.address).toBe("456 Updated Street");
 
     const residentUser = await prisma.user.findFirst({ where: { username: household.residentUsername } });
@@ -79,7 +79,7 @@ describe("resident personal-information update", () => {
     const residentA = await loginAs(householdA.residentUsername, TEST_PASSWORD);
 
     const res = await residentA.patch(`/api/households/${householdA.householdId}`).send({
-      contactNumber: "0900-000-0001",
+      contactNumber: "09000000001",
       householdId: "some-other-household-id",
       purokId: purokB.purokId,
       id: "hh-hijacked",

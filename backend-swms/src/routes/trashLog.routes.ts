@@ -10,6 +10,10 @@ router.use(authRequired);
 // GET /api/trash-logs — scoped, optional ?householdId=
 router.get("/", trashLogController.list);
 
+// GET /api/trash-logs/collection-week — the current weekly collection window
+// (registered before /:id so it isn't read as an id)
+router.get("/collection-week", trashLogController.currentCollectionWeek);
+
 // GET /api/trash-logs/:id — single record, scoped the same way as the list
 // (admin: any; purok-leader: their purok; resident: their own household).
 router.get("/:id", trashLogController.getById);

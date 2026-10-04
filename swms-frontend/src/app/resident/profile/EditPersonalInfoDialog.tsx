@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Pencil, Loader2 } from "lucide-react";
 import { Modal, Field, inputClass } from "@/components/ui/Modal";
 import { api } from "@/lib/api";
+import { contactNumberInputProps, toContactNumber } from "@/lib/numericInput";
 import type { Household } from "@/lib/types";
 
 // Edits exactly the fields this account is allowed to change about itself:
@@ -22,11 +23,13 @@ export function EditPersonalInfoDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [representative, setRepresentative] = useState(household.representative);
   const [email, setEmail] = useState(household.email ?? "");
   const [contactNumber, setContactNumber] = useState(household.contactNumber);
   const [address, setAddress] = useState(household.address);
 
   const openDialog = () => {
+    setRepresentative(household.representative);
     setEmail(household.email ?? "");
     setContactNumber(household.contactNumber);
     setAddress(household.address);
@@ -45,6 +48,7 @@ export function EditPersonalInfoDialog({
     setSubmitting(true);
     try {
       const updated = await api.updateHousehold(household.id, {
+        representative: representative.trim(),
         email: email.trim(),
         contactNumber: contactNumber.trim(),
         address: address.trim(),
@@ -72,14 +76,17 @@ export function EditPersonalInfoDialog({
         open={open}
         onClose={close}
         title="Edit personal information"
-        description="Update your email, contact number, or address."
+        description="Update your name, email, contact number, or address."
       >
         <form onSubmit={submit} className="space-y-3">
+          <Field label="Full name (house representative)">
+            <input className={inputClass} value={representative} onChange={(e) => setRepresentative(e.target.value)} required maxLength={120} />
+          </Field>
           <Field label="Email">
             <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} required />
           </Field>
           <Field label="Contact number">
-            <input className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} required />
+            <input {...contactNumberInputProps} className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(toContactNumber(e.target.value))} required />
           </Field>
           <Field label="Address">
             <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} required />

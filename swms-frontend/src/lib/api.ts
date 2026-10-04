@@ -24,6 +24,30 @@ export interface PaymentCollectionStat {
   target: number | null;
 }
 
+export interface AdminDashboardSummary {
+  currentPeriod: string;
+  totalHouseholds: number;
+  paid: number;
+  unpaid: number;
+  // Registered this month and not paid yet (not counted in unpaid).
+  newHouseholds: number;
+  openViolations: number;
+  puroks: Purok[];
+  monthly: MonthlyCollectionStat[];
+  recentLogs: TrashLog[];
+}
+
+// Weekly collection window (see backend lib/collectionWeek.ts). Dates are
+// YYYY-MM-DD; a household gets one trash log per week.
+export interface CollectionWeek {
+  collectionDay: string;
+  collectionTime: string | null;
+  weekStart: string;
+  weekEnd: string;
+  // Today when today is collection day, otherwise the next one.
+  nextCollectionDate: string;
+}
+
 export interface Account {
   id: number;
   username: string;
@@ -31,6 +55,8 @@ export interface Account {
   email: string;
   role: Role;
   householdCode: string | null;
+  // True when this resident's household has been removed (can't log in).
+  householdRemoved?: boolean;
 }
 
 export interface PurokAccounts {
@@ -107,6 +133,7 @@ export const api = {
   household: (id: string) => request<Household>(`/households/${id}`),
   trashLogs: (householdId?: string) => request<TrashLog[]>(`/trash-logs${qs(householdId)}`),
   trashLog: (id: string) => request<TrashLog>(`/trash-logs/${id}`),
+  collectionWeek: () => request<CollectionWeek>("/trash-logs/collection-week"),
   payments: (householdId?: string) => request<Payment[]>(`/payments${qs(householdId)}`),
   currentPaymentPeriod: () => request<{ period: string }>("/payments/current-period"),
   violations: (householdId?: string) => request<Violation[]>(`/violations${qs(householdId)}`),
@@ -133,6 +160,7 @@ export const api = {
     }),
   monthlyCollectionStats: () => request<MonthlyCollectionStat[]>("/stats/monthly-collection"),
   paymentCollectionStats: () => request<PaymentCollectionStat[]>("/stats/payment-collection"),
+  adminDashboard: () => request<AdminDashboardSummary>("/stats/admin-dashboard"),
 
   createTrashLog: (input: {
     householdId: string;
@@ -201,7 +229,6 @@ export const api = {
   createPurok: (input: {
     name: string;
     leaderName: string;
-    complianceRate?: number;
     username: string;
     password: string;
     email: string;

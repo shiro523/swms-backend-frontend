@@ -8,6 +8,7 @@ import { ReportPreviewModal } from "@/components/reports/ReportPreviewModal";
 import { exportToCsv } from "@/lib/exportCsv";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { complianceExportValue } from "@/lib/householdStatus";
 
 export default function ReportsPage() {
   const [viewingKey, setViewingKey] = useState<string | null>(null);
@@ -47,7 +48,7 @@ export default function ReportsPage() {
             rows: object[];
           }[] = [
             { key: "trash-logs", title: "Trash Logs Report", description: "All collection scans with compliance status by household and purok.", icon: ScrollText, rows: trashLogs },
-            { key: "violations", title: "Violation Report", description: "Improper segregation, missed collections, and repeat offenders.", icon: AlertTriangle, rows: violations },
+            { key: "violations", title: "Violation Report", description: "Improper segregation violations and repeat offenders.", icon: AlertTriangle, rows: violations },
             { key: "payments", title: "Payment Collection Report", description: "Monthly fee status, amounts collected, and outstanding balances.", icon: Wallet, rows: payments },
             {
               key: "households",
@@ -59,8 +60,8 @@ export default function ReportsPage() {
                 representative: h.representative,
                 purok: h.purokName,
                 members: h.members.length,
-                compliance: h.complianceRate,
-                payment: h.paymentStatus,
+                compliance: complianceExportValue(h),
+                payment: h.periodPaymentStatus,
               })),
             },
             { key: "puroks", title: "Purok Report", description: "Household counts and compliance rate per purok.", icon: MapPinned, rows: puroks },

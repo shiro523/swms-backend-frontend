@@ -54,7 +54,31 @@ export async function getDbTodayAndTime(): Promise<{ today: Date; time: string }
 // "wrong", only ever misread if something tries to format it without
 // accounting for Philippines local time, which the two helpers above exist
 // to do correctly.
-export async function getDbNow(): Promise<Date> {
+//
+// Still the DB's clock, but without a DB round trip on every call: the
+// offset between the DB clock and this process's clock is measured once and
+// re-measured every CLOCK_SYNC_INTERVAL_MS, then applied to the local clock.
+// Accurate to within one network round trip (tens of ms), which nothing here
+// depends on — callers use calendar days, minutes, or 30-day windows.
+const CLOCK_SYNC_INTERVAL_MS = 10 * 60 * 1000;
+let clockOffsetMs = 0;
+let lastClockSyncAt = 0;
+let pendingClockSync: Promise<void> | null = null;
+
+async function syncClockOffset(): Promise<void> {
+  const before = Date.now();
   const rows = await prisma.$queryRaw<{ now: Date }[]>`SELECT NOW() AS now`;
-  return rows[0].now;
+  const after = Date.now();
+  clockOffsetMs = rows[0].now.getTime() - (before + after) / 2;
+  lastClockSyncAt = after;
+}
+
+export async function getDbNow(): Promise<Date> {
+  if (Date.now() - lastClockSyncAt > CLOCK_SYNC_INTERVAL_MS) {
+    pendingClockSync ??= syncClockOffset().finally(() => {
+      pendingClockSync = null;
+    });
+    await pendingClockSync;
+  }
+  return new Date(Date.now() + clockOffsetMs);
 }

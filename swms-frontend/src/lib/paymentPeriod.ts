@@ -65,3 +65,54 @@ export function splitHouseholdsByCurrentPeriod(
     unpaidHouseholds: households.filter((h) => !paidHouseholdIds.has(h.id)),
   };
 }
+
+// --- Year / month filtering --------------------------------------------
+// Periods are "Month YYYY", so a year of records has at most 12 of them.
+// Instead of one ever-growing period list, pages filter by year, then month.
+
+export const MONTH_LABELS = MONTH_NAMES.map((m) => m[0].toUpperCase() + m.slice(1));
+
+// Filter values: "all", a year ("2026"), or UNRECOGNIZED_YEAR for legacy
+// periods with no year (e.g. "October") — kept visible so they can be found
+// and fixed with "Correct period" rather than silently disappearing.
+export const ALL = "all";
+export const UNRECOGNIZED_YEAR = "other";
+
+// Same period, compared the way splitHouseholdsByCurrentPeriod does
+// (trimmed, case-insensitive).
+export function isSamePeriod(a: string, b: string): boolean {
+  return normalizePeriod(a) === normalizePeriod(b);
+}
+
+export function parsePeriod(period: string): { year: number; month: number } | null {
+  const key = periodSortKey(period);
+  return key === null ? null : { year: Math.floor(key / 12), month: key % 12 };
+}
+
+// Years that have payments, newest first, always including the current
+// period's year; plus UNRECOGNIZED_YEAR when any period has no valid year.
+export function periodYearOptions(periods: Iterable<string>, currentPeriod: string): string[] {
+  const years = new Set<number>();
+  let hasUnrecognized = false;
+  const current = parsePeriod(currentPeriod);
+  if (current) years.add(current.year);
+  for (const period of periods) {
+    const parsed = parsePeriod(period);
+    if (parsed) years.add(parsed.year);
+    else hasUnrecognized = true;
+  }
+  const options = Array.from(years).sort((a, b) => b - a).map(String);
+  return hasUnrecognized ? [...options, UNRECOGNIZED_YEAR] : options;
+}
+
+// `month` is "all" or a 0-based month index as a string ("0" = January).
+export function matchesYearMonth(period: string, year: string, month: string): boolean {
+  if (year === ALL) {
+    if (month === ALL) return true;
+    return parsePeriod(period)?.month === Number(month);
+  }
+  const parsed = parsePeriod(period);
+  if (year === UNRECOGNIZED_YEAR) return parsed === null;
+  if (!parsed || parsed.year !== Number(year)) return false;
+  return month === ALL || parsed.month === Number(month);
+}

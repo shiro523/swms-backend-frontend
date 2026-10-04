@@ -9,6 +9,7 @@ import { ExportButton } from "@/components/ui/ExportButton";
 import { RegisterHouseholdDialog } from "@/components/households/RegisterHouseholdDialog";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { complianceLabel, complianceExportValue } from "@/lib/householdStatus";
 import { Household } from "@/lib/types";
 
 const columns: Column<Household>[] = [
@@ -20,8 +21,8 @@ const columns: Column<Household>[] = [
     ) },
   { header: "Members", accessor: (h) => h.members.length },
   { header: "Contact", accessor: (h) => h.contactNumber },
-  { header: "Compliance", accessor: (h) => `${h.complianceRate}%` },
-  { header: "Payment", accessor: (h) => <StatusBadge status={h.paymentStatus} /> },
+  { header: "Compliance", accessor: (h) => complianceLabel(h) },
+  { header: "Payment", accessor: (h) => <StatusBadge status={h.periodPaymentStatus} /> },
 ];
 
 const searchKeys = (h: Household) => `${h.representative} ${h.code}`;
@@ -42,8 +43,8 @@ export default function PurokLeaderHouseholdsPage() {
     representative: h.representative,
     members: h.members.length,
     contact: h.contactNumber,
-    compliance: h.complianceRate,
-    payment: h.paymentStatus,
+    compliance: complianceExportValue(h),
+    payment: h.periodPaymentStatus,
   }));
 
   return (

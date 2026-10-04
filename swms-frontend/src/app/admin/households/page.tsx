@@ -8,6 +8,7 @@ import { DataTable, Column } from "@/components/ui/DataTable";
 import { ExportButton } from "@/components/ui/ExportButton";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
+import { complianceLabel, complianceExportValue } from "@/lib/householdStatus";
 import { Household } from "@/lib/types";
 
 const RESTORE_WINDOW_DAYS = 30;
@@ -40,7 +41,7 @@ const activeColumns: Column<Household>[] = [
   { header: "Purok", accessor: (h) => h.purokName },
   { header: "Members", accessor: (h) => h.members.length },
   { header: "Contact", accessor: (h) => h.contactNumber },
-  { header: "Compliance", accessor: (h) => `${h.complianceRate}%` },
+  { header: "Compliance", accessor: (h) => complianceLabel(h) },
 ];
 
 const removedColumns: Column<Household>[] = [
@@ -102,7 +103,7 @@ export default function HouseholdsPage() {
                   purok: h.purokName,
                   members: h.members.length,
                   contact: h.contactNumber,
-                  compliance: h.complianceRate,
+                  compliance: complianceExportValue(h),
                 }))}
               />
             )}

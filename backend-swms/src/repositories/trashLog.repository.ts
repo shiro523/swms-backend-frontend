@@ -1,5 +1,39 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/generated/prisma/client";
+
+type Tx = Prisma.TransactionClient;
+
+// A household's compliance rate from its real collection history (missed
+// collections count against it). With no logs at all it stays at the
+// placeholder 100 — see Household.hasCollectionRecords on the API.
+async function recomputeHouseholdCompliance(tx: Tx, householdId: string) {
+  const [totalLogs, compliantLogs] = await Promise.all([
+    tx.trashLog.count({ where: { householdId } }),
+    tx.trashLog.count({ where: { householdId, status: "compliant" } }),
+  ]);
+  const complianceRate = totalLogs > 0 ? Math.round((compliantLogs / totalLogs) * 100) : 100;
+  const household = await tx.household.update({
+    where: { id: householdId },
+    data: { complianceRate },
+    select: { purokId: true },
+  });
+  return household.purokId;
+}
+
+// The purok's own compliance figure is the average across its households.
+// Only households with at least one log count: a household with none still
+// carries the placeholder 100%, which would inflate the average.
+async function recomputePurokCompliance(tx: Tx, purokId: string) {
+  const purokAvg = await tx.household.aggregate({
+    where: { purokId, trashLogs: { some: {} } },
+    _avg: { complianceRate: true },
+  });
+  await tx.purok.update({
+    where: { id: purokId },
+    data: { complianceRate: Math.round(purokAvg._avg.complianceRate ?? 100) },
+  });
+}
 
 const TRASH_LOG_INCLUDE = {
   household: { include: { purok: true } },
@@ -18,8 +52,52 @@ export const trashLogRepository = {
     return prisma.trashLog.findUnique({ where: { id }, include: TRASH_LOG_INCLUDE });
   },
 
-  findDuplicate(householdId: string, logDate: Date) {
-    return prisma.trashLog.findFirst({ where: { householdId, logDate } });
+  // The household's log within [from, to) — one collection week — if any.
+  findInRange(householdId: string, from: Date, to: Date) {
+    return prisma.trashLog.findFirst({ where: { householdId, logDate: { gte: from, lt: to } } });
+  },
+
+  // Records a "missed" log, dated on the collection day, for every active
+  // household (in an active purok, registered by that day, matching
+  // `householdWhere`) with no log in [weekStart, weekEnd). Idempotent: a
+  // household that already has a log that week is skipped, and the
+  // (householdId, logDate) unique index backs that up. Returns the count.
+  async createMissedForWeek(weekStart: Date, weekEnd: Date, householdWhere: Record<string, unknown> = {}) {
+    const households = await prisma.household.findMany({
+      where: {
+        ...householdWhere,
+        removedAt: null,
+        purok: { archivedAt: null },
+        registeredAt: { lte: weekStart },
+        trashLogs: { none: { logDate: { gte: weekStart, lt: weekEnd } } },
+      },
+      select: { id: true },
+    });
+    if (households.length === 0) return 0;
+
+    return prisma.$transaction(async (tx) => {
+      const created = await tx.trashLog.createMany({
+        data: households.map((h) => ({
+          id: `tl-${randomUUID()}`,
+          householdId: h.id,
+          logDate: weekStart,
+          logTime: "—",
+          collector: "System",
+          status: "missed",
+          disposedBy: "representative",
+          notes: "No collection was recorded for this household during this collection week.",
+        })),
+        skipDuplicates: true,
+      });
+      const purokIds = new Set<string>();
+      for (const h of households) {
+        purokIds.add(await recomputeHouseholdCompliance(tx, h.id));
+      }
+      for (const purokId of purokIds) {
+        await recomputePurokCompliance(tx, purokId);
+      }
+      return created.count;
+    }, { timeout: 60_000 });
   },
 
   // Inserts the trash log and — when a violation record accompanies it — the
@@ -47,8 +125,14 @@ export const trashLogRepository = {
     },
     violationData: { id: string; householdId: string; type: string; vDate: Date; isRepeat: boolean; notes: string } | null,
     notifyHousehold: { purokId: string; code: string },
+    // A late pickup scanned after the household was auto-marked "missed" for
+    // this collection week replaces that missed log (one log per week).
+    replaceMissedLogId: string | null = null,
   ) {
     return prisma.$transaction(async (tx) => {
+      if (replaceMissedLogId) {
+        await tx.trashLog.deleteMany({ where: { id: replaceMissedLogId, status: "missed" } });
+      }
       const log = await tx.trashLog.create({ data: logData });
       if (violationData) {
         await tx.violation.create({ data: violationData });
@@ -86,27 +170,8 @@ export const trashLogRepository = {
         });
       }
 
-      const [totalLogs, compliantLogs] = await Promise.all([
-        tx.trashLog.count({ where: { householdId: logData.householdId } }),
-        tx.trashLog.count({ where: { householdId: logData.householdId, status: "compliant" } }),
-      ]);
-      const complianceRate = totalLogs > 0 ? Math.round((compliantLogs / totalLogs) * 100) : 100;
-      const household = await tx.household.update({
-        where: { id: logData.householdId },
-        data: { complianceRate },
-        select: { purokId: true },
-      });
-
-      // The purok's own compliance figure is the average across its households
-      // — keep it in sync now that one of them just changed.
-      const purokAvg = await tx.household.aggregate({
-        where: { purokId: household.purokId },
-        _avg: { complianceRate: true },
-      });
-      await tx.purok.update({
-        where: { id: household.purokId },
-        data: { complianceRate: Math.round(purokAvg._avg.complianceRate ?? 100) },
-      });
+      const purokId = await recomputeHouseholdCompliance(tx, logData.householdId);
+      await recomputePurokCompliance(tx, purokId);
 
       return log;
     });

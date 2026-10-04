@@ -8,13 +8,25 @@ function formatDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function averageCompliance(households: { complianceRate: number }[]): number | null {
+  if (households.length === 0) return null;
+  return Math.round(households.reduce((sum, h) => sum + Number(h.complianceRate), 0) / households.length);
+}
+
 export function mapPurok(p: any) {
+  const all: { removedAt: Date | null; complianceRate: number; _count?: { trashLogs: number } }[] = p.households ?? [];
+  const active = all.filter((h) => h.removedAt === null);
   return {
     id: p.id,
     name: p.name,
     leader: p.leaderName,
-    households: Number(p._count?.households ?? 0),
-    complianceRate: Number(p.complianceRate),
+    // Active households only; removed ones are counted separately.
+    households: active.length,
+    removedHouseholds: all.length - active.length,
+    // Live average over active households with collection records (see
+    // PUROK_INCLUDE in purok.repository.ts); null = no records yet, never a
+    // made-up 100%.
+    complianceRate: averageCompliance(active.filter((h) => (h._count?.trashLogs ?? 0) > 0)),
     // ISO string (or null if active) — the frontend uses this only for
     // display/countdown purposes; the actual 30-day restore/delete gates are
     // always re-checked server-side, never trusted from this value alone.
@@ -31,7 +43,11 @@ export function mapFamilyMember(m: any) {
   };
 }
 
-export function mapHousehold(h: any) {
+export type PeriodPaymentStatus = "paid" | "unpaid" | "new";
+
+// periodPaymentStatus is computed by householdService (it needs the current
+// period's payments); see periodPaymentStatus() there.
+export function mapHousehold(h: any, periodPaymentStatus: PeriodPaymentStatus) {
   return {
     id: h.id,
     code: h.code,
@@ -43,7 +59,11 @@ export function mapHousehold(h: any) {
     members: (h.members ?? []).map(mapFamilyMember),
     registeredAt: formatDate(h.registeredAt),
     paymentStatus: h.paymentStatus,
+    periodPaymentStatus,
     complianceRate: Number(h.complianceRate),
+    // False until the first trash log — complianceRate is a placeholder
+    // (100) until then and shouldn't be presented as a real record.
+    hasCollectionRecords: Number(h._count?.trashLogs ?? 0) > 0,
     username: h.users?.[0]?.username ?? null,
     email: h.users?.[0]?.email ?? null,
     // The resident login account's own creation date — already fetched via
@@ -143,6 +163,8 @@ export function mapAccount(u: any) {
     email: u.email,
     role: u.role,
     householdCode: u.household?.code ?? null,
+    // A removed household's resident can no longer log in.
+    householdRemoved: u.household?.removedAt != null,
   };
 }
 

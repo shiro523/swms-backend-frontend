@@ -1,17 +1,30 @@
 import { prisma } from "@/lib/prisma";
+import { invalidateAuthCache } from "@/lib/authCache";
+
+// What mapPurok needs from each household: whether it was removed (active
+// and removed households are counted separately — removed ones are history,
+// but still block permanent deletion), its compliance rate, and whether it
+// has any trash logs (the purok figure is the live average over active
+// households with logs). Purok.complianceRate as stored lags between logs,
+// so it is not displayed.
+const PUROK_INCLUDE = {
+  households: {
+    select: { removedAt: true, complianceRate: true, _count: { select: { trashLogs: true } } },
+  },
+};
 
 export const purokRepository = {
   findMany(where: Record<string, unknown>) {
     return prisma.purok.findMany({
       where,
-      include: { _count: { select: { households: true } } },
+      include: PUROK_INCLUDE,
       orderBy: { name: "asc" },
     });
   },
   findByIdWithCount(id: string) {
     return prisma.purok.findUnique({
       where: { id },
-      include: { _count: { select: { households: true } } },
+      include: PUROK_INCLUDE,
     });
   },
   findById(id: string) {
@@ -21,12 +34,13 @@ export const purokRepository = {
     id: string;
     name: string;
     leaderName: string;
-    complianceRate: number;
     user: { username: string; passwordHash: string; email: string };
   }) {
     await prisma.$transaction([
       prisma.purok.create({
-        data: { id: data.id, name: data.name, leaderName: data.leaderName, complianceRate: data.complianceRate },
+        // No starting compliance figure: a new purok has no collection
+        // records, so its rate is computed only once logs exist (mapPurok).
+        data: { id: data.id, name: data.name, leaderName: data.leaderName },
       }),
       // The purok-leader login account for this purok.
       prisma.user.create({
@@ -45,20 +59,26 @@ export const purokRepository = {
     return prisma.purok.update({ where: { id }, data });
   },
 
-  archive(id: string, at: Date) {
-    return prisma.purok.update({
+  // archive/restore/deleteWithLeader invalidate the auth cache: a leader's
+  // access depends on their purok's archived state (see authRequired()).
+  async archive(id: string, at: Date) {
+    const row = await prisma.purok.update({
       where: { id },
       data: { archivedAt: at },
-      include: { _count: { select: { households: true } } },
+      include: PUROK_INCLUDE,
     });
+    invalidateAuthCache();
+    return row;
   },
 
-  restore(id: string) {
-    return prisma.purok.update({
+  async restore(id: string) {
+    const row = await prisma.purok.update({
       where: { id },
       data: { archivedAt: null },
-      include: { _count: { select: { households: true } } },
+      include: PUROK_INCLUDE,
     });
+    invalidateAuthCache();
+    return row;
   },
 
   // Every dependency that must be zero before a permanently-archived purok
@@ -92,10 +112,12 @@ export const purokRepository = {
   // orphan the leader account (purokId -> null), never remove it, leaving a
   // stray login with no purok. Scoped to role: "purok-leader" specifically
   // — never a general user-delete, just the one account this operation owns.
-  deleteWithLeader(id: string) {
-    return prisma.$transaction([
+  async deleteWithLeader(id: string) {
+    const result = await prisma.$transaction([
       prisma.user.deleteMany({ where: { purokId: id, role: "purok-leader" } }),
       prisma.purok.delete({ where: { id } }),
     ]);
+    invalidateAuthCache();
+    return result;
   },
 };

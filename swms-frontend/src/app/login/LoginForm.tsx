@@ -13,7 +13,14 @@ interface DemoAccount {
   password: string;
 }
 
-export function LoginForm({ demoAccounts }: { demoAccounts: DemoAccount[] }) {
+// Live barangay totals from GET /api/stats/public (null = unavailable).
+export interface LoginStats {
+  households: number;
+  puroks: number;
+  complianceRate: number | null;
+}
+
+export function LoginForm({ demoAccounts, stats }: { demoAccounts: DemoAccount[]; stats: LoginStats | null }) {
   const { user, loading: authLoading, login } = useAuth();
   const router = useRouter();
 
@@ -77,16 +84,18 @@ export function LoginForm({ demoAccounts }: { demoAccounts: DemoAccount[] }) {
 
         <div className="relative grid grid-cols-3 gap-4 border-t border-white/10 pt-6 text-sm">
           <div>
-            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">196</p>
-            <p className="text-white/50">households</p>
+            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">{stats ? stats.households : "—"}</p>
+            <p className="text-white/50">{stats?.households === 1 ? "household" : "households"}</p>
           </div>
           <div>
-            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">5</p>
-            <p className="text-white/50">puroks</p>
+            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">{stats ? stats.puroks : "—"}</p>
+            <p className="text-white/50">{stats?.puroks === 1 ? "purok" : "puroks"}</p>
           </div>
           <div>
-            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">87%</p>
-            <p className="text-white/50">compliance</p>
+            <p className="font-[family-name:var(--font-display)] text-xl font-semibold">
+              {stats?.complianceRate != null ? `${stats.complianceRate}%` : "—"}
+            </p>
+            <p className="text-white/50">{stats && stats.complianceRate == null ? "compliance · no collections yet" : "compliance"}</p>
           </div>
         </div>
       </div>

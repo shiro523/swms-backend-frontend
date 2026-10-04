@@ -40,7 +40,7 @@ export default function ResidentViolationsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Compliance record" title="My violations" description="Segregation and collection violations recorded for your household." />
+      <PageHeader eyebrow="Compliance record" title="My violations" description="Segregation violations recorded for your household. Missed collections appear in My Trash Logs." />
       <AsyncSection query={query}>
         {(violations) => {
           const active = violations.filter((v) => v.status === "active");

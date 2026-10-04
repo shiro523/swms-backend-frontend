@@ -4,6 +4,7 @@ import { useState } from "react";
 import { UserPlus, Plus, Trash2, Loader2 } from "lucide-react";
 import { Modal, Field, inputClass } from "@/components/ui/Modal";
 import { api } from "@/lib/api";
+import { contactNumberInputProps, toContactNumber, ageInputProps, toAge } from "@/lib/numericInput";
 import type { Household } from "@/lib/types";
 
 interface MemberDraft {
@@ -90,7 +91,7 @@ export function RegisterHouseholdDialog({
             <input className={inputClass} value={representative} onChange={(e) => setRepresentative(e.target.value)} required />
           </Field>
           <Field label="Contact number">
-            <input className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(e.target.value)} required />
+            <input {...contactNumberInputProps} className={inputClass} value={contactNumber} onChange={(e) => setContactNumber(toContactNumber(e.target.value))} required />
           </Field>
           <Field label="Address">
             <input className={inputClass} value={address} onChange={(e) => setAddress(e.target.value)} required />
@@ -131,8 +132,8 @@ export function RegisterHouseholdDialog({
                     onChange={(e) => setMembers((arr) => arr.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} />
                   <input placeholder="Relation" className={inputClass} value={m.relation}
                     onChange={(e) => setMembers((arr) => arr.map((x, j) => (j === i ? { ...x, relation: e.target.value } : x)))} />
-                  <input placeholder="Age" type="number" min="0" className="w-20 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-ink outline-none focus:border-pine" value={m.age}
-                    onChange={(e) => setMembers((arr) => arr.map((x, j) => (j === i ? { ...x, age: e.target.value } : x)))} />
+                  <input placeholder="Age" {...ageInputProps} className="w-20 rounded-lg border border-line bg-paper px-2 py-2 text-sm text-ink outline-none focus:border-pine" value={m.age}
+                    onChange={(e) => setMembers((arr) => arr.map((x, j) => (j === i ? { ...x, age: toAge(e.target.value) } : x)))} />
                   <button type="button" onClick={() => setMembers((arr) => arr.filter((_, j) => j !== i))} className="text-ink/40 hover:text-clay" aria-label="Remove">
                     <Trash2 size={15} />
                   </button>

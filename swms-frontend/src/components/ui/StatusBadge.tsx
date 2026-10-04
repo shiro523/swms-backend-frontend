@@ -17,8 +17,10 @@ const STATUS_TONE: Record<string, Tone> = {
   violation: "clay",
   unpaid: "clay",
   missed: "clay",
+  removed: "clay",
   pending: "gold",
   "walk-in": "azure",
+  new: "azure",
   transferred: "azure",
 };
 

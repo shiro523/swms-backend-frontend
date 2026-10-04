@@ -12,7 +12,7 @@ const columns: Column<TrashLog>[] = [
   { header: "Date", accessor: (t) => t.date },
   { header: "Time", accessor: (t) => t.time },
   { header: "Collector", accessor: (t) => t.collector },
-  { header: "Disposed by", accessor: (t) => (t.disposedBy === "owner" ? "Me" : "Someone on my behalf") },
+  { header: "Disposed by", accessor: (t) => (t.status === "missed" ? "—" : t.disposedBy === "owner" ? "Me" : "Someone on my behalf") },
   { header: "Status", accessor: (t) => <StatusBadge status={t.status} /> },
 ];
 

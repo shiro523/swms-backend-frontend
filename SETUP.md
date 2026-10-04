@@ -34,6 +34,10 @@ In a second terminal:
 ```bash
 cd swms-frontend
 npm install
+# in case if there ws an issue on installing the packages
+npm install-scripts approve sharp unrs-resolver
+npm rebuild sharp unrs-resolver
+
 npm run dev         # UI on http://localhost:3000
 ```
 
