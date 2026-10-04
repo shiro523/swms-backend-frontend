@@ -116,3 +116,17 @@ export function matchesYearMonth(period: string, year: string, month: string): b
   if (!parsed || parsed.year !== Number(year)) return false;
   return month === ALL || parsed.month === Number(month);
 }
+
+// Human label for a year/month filter selection, e.g. "November 2026",
+// "2026", "November (all years)", "All years".
+export function describeYearMonth(year: string, month: string): string {
+  if (year === UNRECOGNIZED_YEAR) return "Payments without a year";
+  const monthLabel = month === ALL ? null : MONTH_LABELS[Number(month)];
+  if (year === ALL) return monthLabel ? `${monthLabel} (all years)` : "All years";
+  return monthLabel ? `${monthLabel} ${year}` : year;
+}
+
+// File-name-safe version of a label: "November 2026" -> "november-2026".
+export function toFileSlug(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}

@@ -12,7 +12,9 @@ export function YearMonthFilter({
   month,
   onYearChange,
   onMonthChange,
+  disabled = false,
 }: {
+  disabled?: boolean;
   years: string[];
   year: string;
   month: string;
@@ -21,7 +23,7 @@ export function YearMonthFilter({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <select aria-label="Year" value={year} onChange={(e) => onYearChange(e.target.value)} className={selectClass}>
+      <select aria-label="Year" value={year} onChange={(e) => onYearChange(e.target.value)} disabled={disabled} className={selectClass}>
         <option value={ALL}>All years</option>
         {years.map((y) => (
           <option key={y} value={y}>
@@ -33,7 +35,7 @@ export function YearMonthFilter({
         aria-label="Month"
         value={month}
         onChange={(e) => onMonthChange(e.target.value)}
-        disabled={year === UNRECOGNIZED_YEAR}
+        disabled={disabled || year === UNRECOGNIZED_YEAR}
         className={selectClass}
       >
         <option value={ALL}>All months</option>

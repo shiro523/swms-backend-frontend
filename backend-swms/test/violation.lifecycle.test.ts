@@ -54,7 +54,7 @@ describe("violation lifecycle", () => {
   }
 
   describe("completion", () => {
-    it("admin can complete an active violation: status, resolvedAt, and resolvedByName are set", async () => {
+    it("admin cannot complete a violation (purok leader only — the admin sends consequence notices)", async () => {
       const purok = await createTestPurok(nextRunId());
       const household = await createTestHousehold(purok);
       const violation = await createActiveViolation(purok, household);
@@ -62,11 +62,10 @@ describe("violation lifecycle", () => {
       const admin = await createTestAdmin(nextRunId());
       const adminAgent = await loginAs(admin.username, TEST_PASSWORD);
       const res = await adminAgent.patch(`/api/violations/${violation.id}/complete`);
+      expect(res.status).toBe(403);
 
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe("completed");
-      expect(res.body.resolvedAt).not.toBeNull();
-      expect(res.body.resolvedByName).toBe("Test Admin");
+      const row = await prisma.violation.findUniqueOrThrow({ where: { id: violation.id } });
+      expect(row.status).toBe("active");
     });
 
     it("the in-scope purok leader can complete an active violation", async () => {
@@ -79,6 +78,7 @@ describe("violation lifecycle", () => {
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe("completed");
+      expect(res.body.resolvedAt).not.toBeNull();
       expect(res.body.resolvedByName).toBe("Test Leader");
     });
 
@@ -98,11 +98,11 @@ describe("violation lifecycle", () => {
       const household = await createTestHousehold(purok);
       const violation = await createActiveViolation(purok, household);
 
-      const adminAgent = await loginAs((await createTestAdmin(nextRunId())).username, TEST_PASSWORD);
-      const first = await adminAgent.patch(`/api/violations/${violation.id}/complete`);
+      const leaderAgent = await loginAs(purok.leaderUsername, TEST_PASSWORD);
+      const first = await leaderAgent.patch(`/api/violations/${violation.id}/complete`);
       expect(first.status).toBe(200);
 
-      const second = await adminAgent.patch(`/api/violations/${violation.id}/complete`);
+      const second = await leaderAgent.patch(`/api/violations/${violation.id}/complete`);
       expect(second.status).toBe(400);
 
       const row = await prisma.violation.findUniqueOrThrow({ where: { id: violation.id } });
@@ -126,10 +126,10 @@ describe("violation lifecycle", () => {
       expect(listAttempt.status).toBe(200);
       expect(listAttempt.body).toEqual([]);
 
-      // Admin is authorized to complete it, unlike leader A.
-      const adminAgent = await loginAs((await createTestAdmin(nextRunId())).username, TEST_PASSWORD);
-      const adminComplete = await adminAgent.patch(`/api/violations/${violationB.id}/complete`);
-      expect(adminComplete.status).toBe(200);
+      // Its own purok leader can complete it, unlike leader A.
+      const leaderB = await loginAs(purokB.leaderUsername, TEST_PASSWORD);
+      const ownComplete = await leaderB.patch(`/api/violations/${violationB.id}/complete`);
+      expect(ownComplete.status).toBe(200);
     });
   });
 
@@ -174,8 +174,7 @@ describe("violation lifecycle", () => {
 
       // Complete violation 1 (the historical one) — proves completing it
       // does not erase it from repeat-offense history.
-      const adminAgent = await loginAs((await createTestAdmin(nextRunId())).username, TEST_PASSWORD);
-      const completeRes = await adminAgent.patch(`/api/violations/${violation1.id}/complete`);
+      const completeRes = await leaderAgent.patch(`/api/violations/${violation1.id}/complete`);
       expect(completeRes.status).toBe(200);
 
       // Free this week up again by moving violation 2 back two weeks.
@@ -224,11 +223,21 @@ describe("violation lifecycle", () => {
       expect(residentNotification).toBeDefined();
       expect(residentNotification?.leaderOnly).toBe(false);
       expect(residentNotification?.targetPurokId).toBeNull();
+      expect(residentNotification?.message).toContain("with an Improper Segregation violation");
 
       const leaderNotification = notifications.find((n) => n.targetPurokId === purok.purokId);
       expect(leaderNotification).toBeDefined();
       expect(leaderNotification?.leaderOnly).toBe(true);
       expect(leaderNotification?.targetHouseholdId).toBeNull();
+      // Its own title, so it never looks like an admin's "Violation Notice".
+      expect(leaderNotification?.title).toBe("Violation Recorded");
+
+      // The API tells the leader it's a leaders-only alert.
+      const leaderAgent = await loginAs(purok.leaderUsername, TEST_PASSWORD);
+      const listed = (await leaderAgent.get("/api/notifications")).body.find(
+        (n: { id: string }) => n.id === leaderNotification?.id,
+      );
+      expect(listed.leaderOnly).toBe(true);
     });
   });
 });

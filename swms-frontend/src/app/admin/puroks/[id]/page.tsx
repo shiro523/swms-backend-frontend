@@ -11,12 +11,8 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { EditPurokDialog } from "@/components/puroks/EditPurokDialog";
 import { useApi } from "@/hooks/useApi";
 import { api, ApiError } from "@/lib/api";
+import { restoreWindow } from "@/lib/dateTime";
 
-const RESTORE_WINDOW_DAYS = 30;
-
-function daysSince(iso: string) {
-  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-}
 
 export default function PurokDetailPage() {
   const params = useParams<{ id: string }>();
@@ -67,8 +63,10 @@ export default function PurokDetailPage() {
 
       <AsyncSection query={query}>
         {({ purok, accounts }) => {
-          const archivedDays = purok?.archivedAt ? daysSince(purok.archivedAt) : null;
-          const canRestore = archivedDays !== null && archivedDays <= RESTORE_WINDOW_DAYS;
+          // Exact-time window, same rule as the server's restore check.
+          const archive = purok?.archivedAt ? restoreWindow(purok.archivedAt) : null;
+          const archivedDays = archive?.daysElapsed ?? null;
+          const canRestore = archive?.canRestore ?? false;
           // Not time-gated — the 30-day window only governs how long restore
           // stays available (canRestore above). Deletion only ever depends
           // on zero dependent households — active OR removed, since removed
@@ -146,7 +144,7 @@ export default function PurokDetailPage() {
                   <p>
                     Archived {archivedDays} day{archivedDays === 1 ? "" : "s"} ago.{" "}
                     {canRestore
-                      ? `Restorable for ${RESTORE_WINDOW_DAYS - (archivedDays ?? 0)} more day${RESTORE_WINDOW_DAYS - (archivedDays ?? 0) === 1 ? "" : "s"}.`
+                      ? `Restorable for ${archive?.daysLeft} more day${archive?.daysLeft === 1 ? "" : "s"} (until ${archive?.deadlineDate}).`
                       : "The 30-day restore window has passed."}{" "}
                     All historical households, trash logs, payments, and violations remain fully intact.
                   </p>

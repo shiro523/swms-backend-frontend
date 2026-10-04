@@ -5,6 +5,7 @@ import { QrCode, Wallet, AlertTriangle, ArrowRight } from "lucide-react";
 import { PageHeader, StatCard, Card } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { ViewAllLink } from "@/components/ui/ViewAllLink";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { complianceLabel } from "@/lib/householdStatus";
@@ -89,7 +90,10 @@ export default function ResidentDashboard() {
 
             <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
               <Card className="p-5 xl:col-span-2">
-                <p className="text-sm font-semibold text-ink">Recent trash logs</p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink">Recent trash logs</p>
+                  <ViewAllLink href="/resident/trash-logs" />
+                </div>
                 <div className="mt-3 divide-y divide-line">
                   {recentLogs.map((log) => (
                     <div key={log.id} className="flex items-center justify-between py-2.5 text-sm">

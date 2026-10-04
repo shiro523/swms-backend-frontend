@@ -33,7 +33,7 @@ function formatLongDate(isoDate: string): string {
 
 function audienceLabel(n: NotificationItem): string {
   if (n.targetHouseholdCode) return `Household ${n.targetHouseholdCode}`;
-  if (n.targetPurokName) return n.targetPurokName;
+  if (n.targetPurokName) return n.leaderOnly ? `${n.targetPurokName} · leaders only` : n.targetPurokName;
   return "All households";
 }
 

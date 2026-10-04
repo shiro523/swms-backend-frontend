@@ -12,6 +12,7 @@ import { RemoveHouseholdDialog } from "@/components/households/RemoveHouseholdDi
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import { summarizeTrashLogs } from "@/lib/wasteMonitoring";
+import { toPhDate } from "@/lib/dateTime";
 
 export default function PurokLeaderHouseholdDetailPage() {
   const params = useParams<{ id: string }>();
@@ -52,7 +53,8 @@ export default function PurokLeaderHouseholdDetailPage() {
               description={`House representative for ${household.purokName}`}
               actions={
                 <div className="flex items-center gap-2">
-                  <StatusBadge status={household.periodPaymentStatus} />
+                  {/* A removed household owes nothing this period. */}
+                  <StatusBadge status={household.removedAt ? "removed" : household.periodPaymentStatus} />
                   {!household.removedAt && (
                     <>
                       <RecordPaymentDialog householdId={household.id} onRecorded={() => query.reload()} />
@@ -66,7 +68,7 @@ export default function PurokLeaderHouseholdDetailPage() {
 
             {household.removedAt && (
               <div className="mb-4 rounded-xl border border-clay/30 bg-clay-tint px-4 py-3 text-sm text-clay">
-                This household was removed on {household.removedAt.slice(0, 10)}
+                This household was removed on {toPhDate(household.removedAt)}
                 {household.removalReason ? ` — ${household.removalReason}` : ""}. It is inactive; contact an
                 admin if it needs to be restored.
               </div>
@@ -80,7 +82,7 @@ export default function PurokLeaderHouseholdDetailPage() {
                   <p className="flex items-center gap-2"><Mail size={14} className="text-ink/40" /> {household.username ? `@${household.username}` : "No account"} {household.email ? `· ${household.email}` : ""}</p>
                   <p className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {household.contactNumber}</p>
                   <p className="flex items-center gap-2"><MapPin size={14} className="text-ink/40" /> {household.address}, {household.purokName}</p>
-                  <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt?.slice(0, 10) ?? household.registeredAt}</p>
+                  <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt ? toPhDate(household.accountCreatedAt) : household.registeredAt}</p>
                 </div>
 
                 <p className="mt-5 text-sm font-semibold text-ink">Account information</p>
@@ -167,7 +169,7 @@ export default function PurokLeaderHouseholdDetailPage() {
                       </div>
                       {v.notes && <p className="mt-1 text-xs text-ink/45">{v.notes}</p>}
                       {v.status === "completed" && v.resolvedByName && (
-                        <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${v.resolvedAt.slice(0, 10)}` : ""}</p>
+                        <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${toPhDate(v.resolvedAt)}` : ""}</p>
                       )}
                     </div>
                   ))}

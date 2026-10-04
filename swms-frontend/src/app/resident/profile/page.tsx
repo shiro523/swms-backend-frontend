@@ -10,6 +10,7 @@ import { useApi } from "@/hooks/useApi";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import { summarizeTrashLogs } from "@/lib/wasteMonitoring";
+import { toPhDate, toPhDateOrDash } from "@/lib/dateTime";
 
 export default function ResidentProfilePage() {
   const { refresh: refreshSession } = useAuth();
@@ -74,7 +75,7 @@ export default function ResidentProfilePage() {
                   <p className="flex items-center gap-2"><Mail size={14} className="text-ink/40" /> {household.username ? `@${household.username}` : "No account"} {household.email ? `· ${household.email}` : ""}</p>
                   <p className="flex items-center gap-2"><Phone size={14} className="text-ink/40" /> {household.contactNumber}</p>
                   <p className="flex items-center gap-2"><MapPin size={14} className="text-ink/40" /> {household.address}, {household.purokName}</p>
-                  <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt?.slice(0, 10) ?? household.registeredAt}</p>
+                  <p className="flex items-center gap-2"><CalendarDays size={14} className="text-ink/40" /> Registered {household.accountCreatedAt ? toPhDate(household.accountCreatedAt) : household.registeredAt}</p>
                 </div>
               </Card>
 
@@ -87,7 +88,7 @@ export default function ResidentProfilePage() {
                   </div>
                   <div>
                     <p className="text-[10.5px] font-medium uppercase tracking-wide text-ink/45">Account created</p>
-                    <p className="mt-0.5">{household.accountCreatedAt?.slice(0, 10) ?? "—"}</p>
+                    <p className="mt-0.5">{toPhDateOrDash(household.accountCreatedAt)}</p>
                   </div>
                 </div>
               </Card>
@@ -160,7 +161,7 @@ export default function ResidentProfilePage() {
                     </div>
                     {v.notes && <p className="mt-1 text-xs text-ink/45">{v.notes}</p>}
                     {v.status === "completed" && v.resolvedByName && (
-                      <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${v.resolvedAt.slice(0, 10)}` : ""}</p>
+                      <p className="mt-1 text-xs text-ink/45">Resolved by {v.resolvedByName}{v.resolvedAt ? ` on ${toPhDate(v.resolvedAt)}` : ""}</p>
                     )}
                   </div>
                 ))}

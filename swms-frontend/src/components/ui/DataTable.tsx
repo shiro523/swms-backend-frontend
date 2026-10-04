@@ -16,12 +16,15 @@ export function DataTable<T extends { id: string }>({
   searchPlaceholder = "Search…",
   searchKeys,
   pageSize = 8,
+  emptyMessage = "No records yet.",
 }: {
   data: T[];
   columns: Column<T>[];
   searchPlaceholder?: string;
   searchKeys?: (row: T) => string;
   pageSize?: number;
+  // Shown when there is no data at all (a search with no hits keeps its own message).
+  emptyMessage?: string;
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -79,7 +82,7 @@ export function DataTable<T extends { id: string }>({
             {pageRows.length === 0 && (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center text-sm text-ink/40">
-                  No records match your search.
+                  {query && data.length > 0 ? "No records match your search." : emptyMessage}
                 </td>
               </tr>
             )}

@@ -5,7 +5,7 @@ import { PageHeader, Card, EmptyState } from "@/components/ui/Primitives";
 import { AsyncSection } from "@/components/ui/AsyncSection";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ViolationStatusBadge } from "@/components/violations/ViolationStatusBadge";
-import { formatResolvedDate } from "@/lib/violation";
+import { formatResolvedDate, VIOLATION_LIMIT } from "@/lib/violation";
 import { useApi } from "@/hooks/useApi";
 import { api } from "@/lib/api";
 import type { Violation } from "@/lib/types";
@@ -50,8 +50,21 @@ export default function ResidentViolationsPage() {
             return <EmptyState title="No violations on record" description="Keep segregating properly to maintain a clean compliance record." />;
           }
 
+          const atLimit = violations.length >= VIOLATION_LIMIT;
           return (
             <div className="space-y-4">
+              <Card className={`p-5 ${atLimit ? "border-clay/40 bg-clay-tint/40" : ""}`}>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink/45">Violations on record</p>
+                <p className="mt-1 font-[family-name:var(--font-display)] text-2xl font-semibold text-ink">
+                  {violations.length} <span className="text-base font-medium text-ink/40">/ {VIOLATION_LIMIT}</span>
+                </p>
+                <p className={`mt-1 text-sm ${atLimit ? "text-clay" : "text-ink/55"}`}>
+                  {atLimit
+                    ? "Your household has reached the violation limit. The barangay may send you a consequence notice — check your notifications and coordinate with your purok leader."
+                    : `Completed violations still count. At ${VIOLATION_LIMIT}, the barangay may send your household a consequence notice.`}
+                </p>
+              </Card>
+
               <Card className="p-5">
                 <p className="text-sm font-semibold text-ink">Active violations</p>
                 {active.length === 0 ? (
