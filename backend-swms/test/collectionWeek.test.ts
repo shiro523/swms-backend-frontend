@@ -99,6 +99,42 @@ describe("weekly collection", () => {
     expect(created).toBe(0);
   });
 
+  it("a removed household keeps its history but gets no new logs (scans refused, never marked missed)", async () => {
+    const purok = await createTestPurok(nextRunId());
+    const household = await createTestHousehold(purok);
+    await prisma.household.update({ where: { id: household.householdId }, data: { registeredAt: day("2026-10-01") } });
+    const leaderAgent = await loginAs(purok.leaderUsername, TEST_PASSWORD);
+
+    // One real scan while active.
+    const scan = await leaderAgent
+      .post("/api/trash-logs")
+      .send({ householdId: household.householdId, status: "compliant", disposedBy: "owner" });
+    expect(scan.status).toBe(201);
+
+    const removed = await leaderAgent.post(`/api/households/${household.householdId}/remove`).send({ reason: "Moved away" });
+    expect(removed.status).toBe(200);
+
+    // History stays visible (this is what Waste monitoring is built from).
+    const logs = await leaderAgent.get(`/api/trash-logs?householdId=${household.householdId}`);
+    expect(logs.body.map((l: { status: string }) => l.status)).toEqual(["compliant"]);
+
+    // New scans are refused.
+    const again = await leaderAgent
+      .post("/api/trash-logs")
+      .send({ householdId: household.householdId, status: "violation", disposedBy: "owner" });
+    expect(again.status).toBe(400);
+    expect(again.body.error).toMatch(/removed/i);
+
+    // The missed-collection job skips it, even for weeks it was never scanned.
+    const created = await trashLogService.markMissedCollections({
+      today: day("2026-10-20"),
+      collectionWeekday: SUNDAY,
+      householdWhere: { id: household.householdId },
+    });
+    expect(created).toBe(0);
+    expect(await prisma.trashLog.count({ where: { householdId: household.householdId } })).toBe(1);
+  });
+
   it("a late pickup replaces this week's missed log, and a second log that week is rejected", async () => {
     const purok = await createTestPurok(nextRunId());
     const household = await createTestHousehold(purok);

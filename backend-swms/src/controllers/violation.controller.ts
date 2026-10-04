@@ -7,6 +7,15 @@ export const violationController = {
     res.json(await violationService.list(req.user!, householdId));
   },
 
+  async householdsAtLimit(req: Request, res: Response) {
+    res.json(await violationService.householdsAtLimit(req.user!));
+  },
+
+  async sendConsequenceNotice(req: Request, res: Response) {
+    const { householdId, message } = req.body as { householdId: string; message: string };
+    res.status(201).json(await violationService.sendConsequenceNotice(householdId, message));
+  },
+
   async complete(req: Request, res: Response) {
     res.json(await violationService.complete(req.user!, String(req.params.id)));
   },

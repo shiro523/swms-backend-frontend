@@ -136,6 +136,8 @@ export function mapNotification(n: any) {
     read: (n.reads?.length ?? 0) > 0,
     targetPurokName: n.targetPurok?.name ?? null,
     targetHouseholdCode: n.targetHousehold?.code ?? null,
+    // Purok alerts meant for the purok leader only — residents never see them.
+    leaderOnly: Boolean(n.leaderOnly),
   };
 }
 

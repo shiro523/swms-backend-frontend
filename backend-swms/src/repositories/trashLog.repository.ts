@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { VIOLATION_LIMIT_ALERT_TITLE, VIOLATION_NOTICE_THRESHOLD } from "@/lib/violationPolicy";
 import type { Prisma } from "@/generated/prisma/client";
 
 type Tx = Prisma.TransactionClient;
@@ -145,7 +146,7 @@ export const trashLogRepository = {
           data: {
             id: `n-${randomUUID().slice(0, 8)}`,
             title: "Waste Segregation Violation",
-            message: `Your household was recorded with a ${violationData.type} violation on ${violationData.vDate.toISOString().slice(0, 10)}. Please comply with the barangay's waste segregation rules to avoid further violations.`,
+            message: `Your household was recorded with ${/^[aeiou]/i.test(violationData.type) ? "an" : "a"} ${violationData.type} violation on ${violationData.vDate.toISOString().slice(0, 10)}. Please comply with the barangay's waste segregation rules to avoid further violations.`,
             type: "violation",
             nDate: today,
             targetHouseholdId: violationData.householdId,
@@ -159,7 +160,9 @@ export const trashLogRepository = {
         await tx.notification.create({
           data: {
             id: `n-${randomUUID().slice(0, 8)}`,
-            title: "Violation Notice",
+            // Distinct from "Violation Notice" (the admin's own messages to a
+            // household), so the two never look alike in the admin's list.
+            title: "Violation Recorded",
             message: `${violationData.type} recorded for household ${notifyHousehold.code}.`,
             type: "violation",
             nDate: today,
@@ -168,6 +171,26 @@ export const trashLogRepository = {
             leaderOnly: true,
           },
         });
+
+        // At (and past) the limit: flag it to the purok leader and the admin
+        // (leaderOnly keeps it from residents; admins see every notice). The
+        // consequence notice itself is the admin's call — see
+        // violationService.sendConsequenceNotice.
+        const total = await tx.violation.count({ where: { householdId: violationData.householdId } });
+        if (total >= VIOLATION_NOTICE_THRESHOLD) {
+          await tx.notification.create({
+            data: {
+              id: `n-${randomUUID().slice(0, 8)}`,
+              title: VIOLATION_LIMIT_ALERT_TITLE,
+              message: `Household ${notifyHousehold.code} now has ${total} violations on record (limit: ${VIOLATION_NOTICE_THRESHOLD}). The admin can send a consequence notice from the Violations page.`,
+              type: "violation",
+              nDate: today,
+              targetPurokId: notifyHousehold.purokId,
+              targetHouseholdId: null,
+              leaderOnly: true,
+            },
+          });
+        }
       }
 
       const purokId = await recomputeHouseholdCompliance(tx, logData.householdId);
